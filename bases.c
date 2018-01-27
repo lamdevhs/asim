@@ -11,23 +11,27 @@ extern Arduino sim;
 extern Diod diods[];
 
 // to make it work:
-int red = 0, yellow = 1;
+int red = 0, yellow = 1, btn = 2;
 
 void setup(void){
   pinMode(red, OUTPUT);
   pinMode(yellow, OUTPUT);
+  pinMode(btn, INPUT_PULLUP);
 }
 
 void blink(int pin){
   digitalWrite(pin, HIGH);
-  delay(1000);
+  delay(100);
   digitalWrite(pin, LOW);
-  delay(1000);
+  delay(100);
 }
 
 void loop(void){
-  while(1) {blink(red);}
-  //blink(yellow);
+  int bst = digitalRead(red);
+  if (bst == HIGH) {
+    blink(red);
+  }
+  else blink(yellow);
 }
 
 #ifdef __ASIM__
@@ -35,12 +39,14 @@ void init(void){
   setSim(UNO);
   diod(red, "red");
   diod(yellow, "yellow");
+  button(btn, "one", 'c');
 }
 
 void main(void){
+  nonblock(NB_ENABLE);
   init();
   setup();
-  printf("%d  %p\n", sim.id == UNO, diods[0].pin);
+  printf("%d  %p\n", sim.id == UNO, diods[1].pin);
   //return;
   launchThreads();
 }
