@@ -19,17 +19,24 @@ void setup(void){
   pinMode(btn, INPUT_PULLUP);
 }
 
+#define FRQ 200
 void blink(int pin){
   digitalWrite(pin, HIGH);
-  delay(100);
+  delay(FRQ);
   digitalWrite(pin, LOW);
-  delay(100);
+  delay(FRQ);
+}
+void analogBlink(int pin){
+  analogWrite(pin, 255);
+  delay(FRQ);
+  analogWrite(pin, 0);
+  delay(FRQ);
 }
 
 void loop(void){
-  int bst = digitalRead(red);
+  int bst = digitalRead(btn);
   if (bst == HIGH) {
-    blink(red);
+    analogBlink(red);
   }
   else blink(yellow);
 }

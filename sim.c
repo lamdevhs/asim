@@ -26,6 +26,9 @@ void setSim(int id){
     pin = &sim.pins[i];
     pin->mode = MODE_NONE;
     pin->value = LOW;
+    pin->isAnalog = 0;
+    pin->canInterrupt = 0;
+    pin->canAnalog = 1; // will depend
   }
 
   if (id == UNO) {
@@ -83,8 +86,8 @@ void digitalWrite(int pinIx, int value){
     return; // ERROR
   }
   DigitalPin *pin = &sim.pins[pinIx];
-  int prevValue = pin->value;
   pin->value = value;
+  pin->isAnalog = 0;
 }
 
 int digitalRead(int pinIx){
@@ -94,7 +97,17 @@ int digitalRead(int pinIx){
   return sim.pins[pinIx].value;
 }
 
-
+void analogWrite(int pinIx, int value){
+  if (!checkDigital(pinIx) || sim.pins[pinIx].mode != OUTPUT) {
+    return; // ERROR
+  }
+  DigitalPin *pin = &sim.pins[pinIx];
+  if (!pin->canAnalog) {
+    return; // ERROR
+  }
+  pin->value = min(max(0, value), 255);
+  pin->isAnalog = 1;
+}
 
 Bool checkDigital(int pinIx){
   return (
@@ -169,22 +182,29 @@ void printDisplay(int row, int col){
 }
 
 void printDiod(Diod *diod){
-  printf("%s [%c]", diod->name, digital2Char(diod->pin->value));
+  char state[4];
+  state2Str(diod->pin, state);
+  printf("%s [%s]", diod->name, state);
   printNL;
 }
 
 void printButton(Button *button){
-  printf("%s (key: %c) [%c]", button->name,
-    button->key,
-    digital2Char(button->pin->value));
+  char state[4];
+  state2Str(button->pin, state);
+  printf("%s (key: %c) [%s]", button->name, button->key, state);
   printNL;
 }
 
-char digital2Char(int value){
-  if (value == HIGH){
-    return '#';
+void state2Str(DigitalPin *pin, char *str){
+  if (pin->value == LOW) {
+    sprintf(str, "   ");
   }
-  return ' ';
+  else if (pin->isAnalog) {
+    sprintf(str, "%3d", pin->value);
+  }
+  else { //if (pin->value == HIGH){
+    sprintf(str, "###");
+  }
 }
 
 

@@ -29,6 +29,9 @@ typedef enum {
 typedef struct digitalPin {
   PinMode mode;
   int value; // HIGH or LOW
+  Bool isAnalog;
+  Bool canInterrupt;
+  Bool canAnalog;
 } DigitalPin;
 
 typedef struct arduino {
@@ -69,6 +72,7 @@ void delay(int ms);
 void pinMode(int pinIx, PinMode mode);
 void digitalWrite(int pinIx, int value);
 int digitalRead(int pinIx);
+void analogWrite(int pinIx, int value);
 
 // internals
 Bool checkDigital(int pinIx);
@@ -79,7 +83,7 @@ void launchThreads(void);
     void printDisplay(int row, int col);
       void printDiod(Diod *diod);
       void printButton(Button *button);
-    char digital2Char(int value);
+      void state2Str(DigitalPin *pin, char* str);
   void *threadLoop(void *_);
   void *threadListener(void *_);
 
@@ -90,5 +94,7 @@ Bool kbhit(void);
 
 #define printNL printf("\n")
 #define printTAB printf("\t")
+#define min(a, b) (a < b ? a : b)
+#define max(a, b) (a > b ? a : b)
 
 #endif // FILE_ASIM // wrapper
