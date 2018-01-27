@@ -55,6 +55,14 @@ typedef struct button
   char key;
 } Button;
 
+typedef struct diodRGB
+{
+  char name[SIZE_NAME];
+  DigitalPin *red;
+  DigitalPin *green;
+  DigitalPin *blue;
+} DiodRGB;
+
 
 
 // functions
@@ -62,6 +70,7 @@ void setSim(int type);
 
 void diod(int pinIx, char *name);
 void button(int pinIx, char *name, char key);
+void diodRGB(int rIx, int gIx, int bIx, char *name);
 
 void loop(void);
 
@@ -83,6 +92,7 @@ void launchThreads(void);
     void printDisplay(int row, int col);
       void printDiod(Diod *diod);
       void printButton(Button *button);
+      void printDiodRGB(DiodRGB *diodRGB);
       void state2Str(DigitalPin *pin, char* str);
   void *threadLoop(void *_);
   void *threadListener(void *_);

@@ -15,6 +15,8 @@ Diod diods[BIGN];
 int diodCount = 0;
 Button buttons[BIGN];
 int buttonCount = 0;
+DiodRGB diodRGBs[BIGN];
+int diodRGBCount = 0;
 
 void setSim(int id){
   int i;
@@ -38,7 +40,7 @@ void setSim(int id){
 }
 
 void diod(int pinIx, char *name){
-  if (!checkDigital(pinIx) || diodCount >= BIGN) {
+  if (diodCount >= BIGN || !checkDigital(pinIx)) {
     return; // ERROR
   }
   
@@ -49,7 +51,7 @@ void diod(int pinIx, char *name){
 }
 
 void button(int pinIx, char *name, char key) {
-  if (!checkDigital(pinIx) || buttonCount >= BIGN) {
+  if (buttonCount >= BIGN || !checkDigital(pinIx)) {
     return; // ERROR
   }
   
@@ -58,6 +60,21 @@ void button(int pinIx, char *name, char key) {
   setDisplayName(button->name, name);
   button->pin = &sim.pins[pinIx];
   button->key = key;
+}
+
+void diodRGB(int rIx, int gIx, int bIx, char *name){
+  if (diodRGBCount >= BIGN ||
+    !checkDigital(rIx) ||
+    !checkDigital(gIx) ||
+    !checkDigital(bIx)) {
+    return; // ERROR
+  }
+  DiodRGB *diodRGB = &diodRGBs[diodRGBCount];
+  ++diodRGBCount;
+  setDisplayName(diodRGB->name, name);
+  diodRGB->red = &sim.pins[rIx];
+  diodRGB->green = &sim.pins[gIx];
+  diodRGB->blue = &sim.pins[bIx];
 }
 
 
@@ -168,12 +185,22 @@ void printDisplay(int row, int col){
   }
 
   // printing buttons
+  printf("RGB diods:\n"); curRow++;
+  for (i = 0; i < diodRGBCount && curRow < row - 1; i++){
+    printTAB;
+    printDiodRGB(&diodRGBs[i]);
+    curRow++;
+  }
+
+  // printing buttons
   printf("buttons:\n"); curRow++;
   for (i = 0; i < buttonCount && curRow < row - 1; i++){
     printTAB;
     printButton(&buttons[i]);
     curRow++;
   }
+
+  
   
   // fill screen
   for (; curRow < row - 1; curRow++){
@@ -192,6 +219,15 @@ void printButton(Button *button){
   char state[4];
   state2Str(button->pin, state);
   printf("%s (key: %c) [%s]", button->name, button->key, state);
+  printNL;
+}
+
+void printDiodRGB(DiodRGB *diodRGB){
+  char redState[4], greenState[4], blueState[4];
+  state2Str(diodRGB->red, redState);
+  state2Str(diodRGB->green, greenState);
+  state2Str(diodRGB->blue, blueState);
+  printf("%s [%s.%s.%s]", diodRGB->name, redState, greenState, blueState);
   printNL;
 }
 
@@ -223,6 +259,7 @@ void *threadListener(void *_){
   int i;
   char c;
   Button *button;
+  int pinIx;
   while (1) {
     while(!kbhit());
     c = fgetc(stdin);
@@ -230,7 +267,9 @@ void *threadListener(void *_){
     for (i = 0; i < buttonCount; i++){
       button = &buttons[i];
       if (button->key == c) {
-        button->pin->value = 1 - button->pin->value;
+        pinIx = button->pin - sim.pins;
+        button->pin->value = (button->pin->value == 0);
+        button->pin->isAnalog = 0; // theoretically not useful
       }
     }
   }

@@ -12,11 +12,15 @@ extern Diod diods[];
 
 // to make it work:
 int red = 0, yellow = 1, btn = 2;
+int r = 3, g = 4, b = 5;
 
 void setup(void){
   pinMode(red, OUTPUT);
   pinMode(yellow, OUTPUT);
   pinMode(btn, INPUT_PULLUP);
+  pinMode(r, OUTPUT);
+  pinMode(g, OUTPUT);
+  pinMode(b, OUTPUT);
 }
 
 #define FRQ 200
@@ -36,9 +40,9 @@ void analogBlink(int pin){
 void loop(void){
   int bst = digitalRead(btn);
   if (bst == HIGH) {
-    analogBlink(red);
+    analogBlink(r);
   }
-  else blink(yellow);
+  else blink(b);
 }
 
 #ifdef __ASIM__
@@ -47,6 +51,7 @@ void init(void){
   diod(red, "red");
   diod(yellow, "yellow");
   button(btn, "one", 'c');
+  diodRGB(r, g, b, "foo");
 }
 
 void main(void){
