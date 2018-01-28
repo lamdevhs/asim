@@ -93,6 +93,8 @@ void launchThreads(void);
       void printDiod(Diod *diod);
       void printButton(Button *button);
       void printDiodRGB(DiodRGB *diodRGB);
+      int getMainColor(int r, int g, int b);
+      int getMix(int mainColor, int r, int g, int b);
       void state2Str(DigitalPin *pin, char* str);
   void *threadLoop(void *_);
   void *threadListener(void *_);

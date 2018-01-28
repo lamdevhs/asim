@@ -222,13 +222,82 @@ void printButton(Button *button){
   printNL;
 }
 
+char colorNames[][8] = {
+  "white",
+  "red", "green", "blue",
+  "yellow", "magenta", "cyan"
+};
+
+#define WWHI 0
+#define RRED 1
+#define GGRE 2
+#define BBLU 3
+#define YYEL 4
+#define MMAG 5
+#define CCYA 6
+
+
 void printDiodRGB(DiodRGB *diodRGB){
   char redState[4], greenState[4], blueState[4];
   state2Str(diodRGB->red, redState);
   state2Str(diodRGB->green, greenState);
   state2Str(diodRGB->blue, blueState);
-  printf("%s [%s.%s.%s]", diodRGB->name, redState, greenState, blueState);
+  
+  int mainColor = getMainColor(
+      diodRGB->red->value,
+      diodRGB->green->value,
+      diodRGB->blue->value);
+  char *mainColorName = colorNames[mainColor];
+  int  mixColor =
+    getMix(
+      mainColor,
+      diodRGB->red->value,
+      diodRGB->green->value,
+      diodRGB->blue->value);
+  char *mixColorName = colorNames[mixColor];
+  printf("%s [R:%s G:%s B:%s] = *%7s -> %7s*",
+    diodRGB->name,
+    redState, greenState, blueState,
+    mainColorName, mixColorName);
   printNL;
+}
+
+int getMainColor(int r, int g, int b){
+  if (r == g && g == b) return WWHI;
+  if (r == g && g > b) return YYEL;
+  if (b == g && g > r) return CCYA;
+  if (r == b && b > g) return MMAG;
+  if (r > b) {
+    if (r > g) return RRED;
+    else // then g > r > b
+      return GGRE;
+  }
+  // then b >= r
+  if (b > g) // then b > (g & r)
+    return BBLU;
+  // then g > b >= r
+  return GGRE;
+}
+
+int getMix(int mainColor, int r, int g, int b){
+  if (mainColor == WWHI) return WWHI;
+  if (mainColor == RRED){
+    if (g == b) return RRED;
+    if (g > b) return YYEL;
+    else return MMAG;
+  }
+  if (mainColor == GGRE){
+    if (r == b) return GGRE;
+    if (r > b) return YYEL;
+    else return CCYA;
+  }
+  if (mainColor == BBLU){
+    if (r == g) return BBLU;
+    if (r > g) return MMAG;
+    else return CCYA;
+  }
+  return mainColor;
+    // ^ if mainColor in cyan/yellow/magenta
 }
 
 void state2Str(DigitalPin *pin, char *str){

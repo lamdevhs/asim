@@ -13,11 +13,17 @@ extern Diod diods[];
 // to make it work:
 int red = 0, yellow = 1, btn = 2;
 int r = 3, g = 4, b = 5;
+int bt2 = 6;
+int bt3 = 7;
+int bt4 = 8;
 
 void setup(void){
   pinMode(red, OUTPUT);
   pinMode(yellow, OUTPUT);
   pinMode(btn, INPUT_PULLUP);
+  pinMode(bt2, INPUT_PULLUP);
+  pinMode(bt3, INPUT_PULLUP);
+  pinMode(bt4, INPUT_PULLUP);
   pinMode(r, OUTPUT);
   pinMode(g, OUTPUT);
   pinMode(b, OUTPUT);
@@ -37,12 +43,20 @@ void analogBlink(int pin){
   delay(FRQ);
 }
 
+void onIfon(int inPin, int outPin){
+  int in = digitalRead(inPin);
+  digitalWrite(outPin, in);
+}
+
 void loop(void){
-  int bst = digitalRead(btn);
+  /*int bst = digitalRead(btn);
   if (bst == HIGH) {
-    analogBlink(r);
+    blink(r);
   }
-  else blink(b);
+  else blink(b);*/
+  onIfon(bt2, r);
+  onIfon(bt3, g);
+  onIfon(bt4, b);
 }
 
 #ifdef __ASIM__
@@ -51,6 +65,9 @@ void init(void){
   diod(red, "red");
   diod(yellow, "yellow");
   button(btn, "one", 'c');
+  button(bt2, "red", 'r');
+  button(bt3, "green", 'g');
+  button(bt4, "blue", 'b');
   diodRGB(r, g, b, "foo");
 }
 
