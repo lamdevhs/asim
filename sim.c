@@ -22,6 +22,9 @@ void setSim(int id){
   int i;
 
   sim.id = id;
+  sim.nextInterrupt = -1;
+  sim.freeInterrupt = 0;
+  sim.interrupted = 0;
 
   DigitalPin *pin;
   for(i = 0; i < BIGN; i++){
@@ -29,13 +32,22 @@ void setSim(int id){
     pin->mode = MODE_NONE;
     pin->value = LOW;
     pin->isAnalog = 0;
-    pin->canInterrupt = 0;
+    pin->canInterrupt = 0; // will depend
+    pin->interruptMode = NO_INTERR;
+    pin->interrFun = NULL;
     pin->canAnalog = 1; // will depend
+
+    sim.canInterrupt[i] = NULL;
   }
 
   if (id == UNO) {
     sim.minDigital = 0;
     sim.maxDigital = 10;
+
+    sim.canInterrupt[0] = &sim.pins[2];
+    sim.canInterrupt[1] = &sim.pins[3];
+    sim.pins[2].canInterrupt = 1;
+    sim.pins[3].canInterrupt = 1;
   }
 }
 
@@ -60,6 +72,7 @@ void button(int pinIx, char *name, char key) {
   setDisplayName(button->name, name);
   button->pin = &sim.pins[pinIx];
   button->key = key;
+  button->isPressed = 0;
 }
 
 void diodRGB(int rIx, int gIx, int bIx, char *name){
@@ -93,23 +106,41 @@ void pinMode(int pinIx, PinMode mode){
   }
   DigitalPin *pin = &sim.pins[pinIx];
   if (pin->mode != MODE_NONE){
-    // WARNING
+    // WARNING?
   }
   pin->mode = mode;
+
+  if (mode == INPUT_PULLUP){
+    pin->value = 1 - pin->value;
+  }
+}
+
+void attachInterrupt(int interrIx, void (*interrFun)(void), InterruptMode mode){
+  // check validity of mode
+  if (interrIx < 0 || BIGN <= interrIx) return; // ERROR
+  DigitalPin *pin = sim.canInterrupt[interrIx];
+  if (pin == NULL) return; // ERROR
+  if (!pin->canInterrupt) return; // BUG!
+  pin->interrFun = interrFun;
+  pin->interruptMode = mode;
 }
 
 void digitalWrite(int pinIx, int value){
   if (!checkDigital(pinIx) || sim.pins[pinIx].mode != OUTPUT) {
-    return; // ERROR
+    return; // ERROR? or input pullup stuff? TODO
   }
-  DigitalPin *pin = &sim.pins[pinIx];
-  pin->value = value;
-  pin->isAnalog = 0;
+  if (value != LOW && value != HIGH) return; // ERROR? or default value? TODO
+  digitalChange(&sim.pins[pinIx], value);
 }
 
+
 int digitalRead(int pinIx){
-  if (!checkDigital(pinIx) || sim.pins[pinIx].mode != INPUT){
-    return -1; //error
+  if (!checkDigital(pinIx)) {
+    return -1;
+  }
+  PinMode mode = sim.pins[pinIx].mode;
+  if (mode != INPUT && mode != INPUT_PULLUP){
+    return -1; //error?
   }
   return sim.pins[pinIx].value;
 }
@@ -152,9 +183,10 @@ void setDisplayName(char *dest, char *src){
 
 void launchThreads(void){
   pthread_t tid;
-  pthread_create(&tid, NULL, threadDisplay, NULL);
+  //pthread_create(&tid, NULL, threadDisplay, NULL);
   pthread_create(&tid, NULL, threadLoop, NULL);
   pthread_create(&tid, NULL, threadListener, NULL);
+  pthread_create(&tid, NULL, threadInterruptions, NULL);
   pthread_exit(NULL);
   return;
 }
@@ -173,8 +205,10 @@ void printDisplay(int row, int col){
   int curRow = 0;
   int curCol = 0;
   int i;
-  
+
   printNL; curRow++;
+  
+  printf("interrs: %d, %d\n", sim.nextInterrupt, sim.freeInterrupt); curRow++;
 
   // printing diods
   printf("diods:\n"); curRow++;
@@ -218,7 +252,8 @@ void printDiod(Diod *diod){
 void printButton(Button *button){
   char state[4];
   state2Str(button->pin, state);
-  printf("%s (key: %c) [%s]", button->name, button->key, state);
+  printf("%s (key: %c) [%s] %s", button->name, button->key, state,
+    button->isPressed ? "(pressed)" : "");
   printNL;
 }
 
@@ -307,8 +342,12 @@ void state2Str(DigitalPin *pin, char *str){
   else if (pin->isAnalog) {
     sprintf(str, "%3d", pin->value);
   }
-  else { //if (pin->value == HIGH){
+  else if (pin->value == HIGH){
     sprintf(str, "###");
+  }
+  else {
+    sprintf(str, "???");
+    // bug!
   }
 }
 
@@ -323,31 +362,106 @@ void *threadLoop(void *_) {
 }
 
 
+void *threadInterruptions(void *_){
+  while (1){
+    continue;
+    if (sim.nextInterrupt < 0) {
+      sim.interrupted = 0;
+      continue;
+    }
+    else {
+      sim.interrupted = 1;
+      if (sim.nextInterrupt) {
+        DigitalPin *pin = sim.interrupts[sim.nextInterrupt];
+        pin->interrFun();
+      }
+      else {} // BUG!
 
-void *threadListener(void *_){
-  int i;
-  char c;
-  Button *button;
-  int pinIx;
-  while (1) {
-    while(!kbhit());
-    c = fgetc(stdin);
-    
-    for (i = 0; i < buttonCount; i++){
-      button = &buttons[i];
-      if (button->key == c) {
-        pinIx = button->pin - sim.pins;
-        button->pin->value = (button->pin->value == 0);
-        button->pin->isAnalog = 0; // theoretically not useful
+      sim.nextInterrupt = (sim.nextInterrupt + 1) % BIGN;
+      if (sim.nextInterrupt == sim.freeInterrupt) {
+        sim.nextInterrupt = -1;
+        sim.interrupted = 0;
       }
     }
   }
 }
 
 
+// interruptions
+void digitalChange(DigitalPin *pin, int newValue){
+  int oldValue = pin->value;
+  if (newValue == SWITCH) newValue = (oldValue == 0);
+  
+  pin->value = newValue;
+  pin->isAnalog = 0;
+
+  if (pin->canInterrupt) {
+    int changed = (newValue != oldValue);
+    InterruptMode mode = pin->interruptMode;
+
+    if (mode == NO_INTERR) return;
+
+    else if (mode == LOW){
+      if (newValue == LOW) addInterrupt(pin);
+    }
+    else if (!changed) return;
+
+    else if (mode == RISING) {
+      if (newValue == HIGH) addInterrupt(pin);
+    }
+    else if (mode == FALLING) {
+      if (newValue == LOW) addInterrupt(pin);
+    }
+    else addInterrupt(pin);
+      // ^ mode == CHANGE (presumably)
+  }
+}
+
+void addInterrupt(DigitalPin *pin){
+  if (!pin->canInterrupt) return; // BUG!
+  if (sim.freeInterrupt >= BIGN) return; // BUG!
+
+  if (sim.freeInterrupt < 0) return;
+    // ^ indicates interrupt memory full! PROBLEM
+
+  sim.interrupts[sim.freeInterrupt] = pin;
+  if (sim.nextInterrupt == -1) {
+    sim.nextInterrupt = sim.freeInterrupt;
+  }
+  sim.freeInterrupt = (sim.freeInterrupt + 1) % BIGN;
+  if (sim.freeInterrupt == sim.nextInterrupt) {
+    // filled memory!
+    sim.freeInterrupt = -1;
+  }
+
+  printf("addInterrupt: %d %d\n", sim.freeInterrupt, sim.nextInterrupt); //&&&&&&&
+}
 
 
-// -----------------
+
+void *threadListener(void *_){
+  int i;
+  char c;
+  Button *button;
+  int pinIx;
+  usleep(5000*1000);
+  printf("listening\n");
+  while (1) {
+    //while(!kbhit());
+    c = fgetc(stdin);
+    printf("<%c>", c);
+    
+    for (i = 0; i < buttonCount; i++){
+      button = &buttons[i];
+      if (button->key == c) {
+        pinIx = button->pin - sim.pins;
+        digitalChange(button->pin, SWITCH);
+        button->isPressed = 1 - button->isPressed;
+      }
+    }
+  }
+}
+
 #include <termios.h>
 #include <stdlib.h>
 
@@ -386,3 +500,4 @@ Bool kbhit(void)
     select(STDIN_FILENO+1, &fds, NULL, NULL, &tv);
     return FD_ISSET(STDIN_FILENO, &fds);
 }
+

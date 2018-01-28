@@ -17,16 +17,22 @@ int bt2 = 6;
 int bt3 = 7;
 int bt4 = 8;
 
+void foo(void){
+  printf("waa\n");
+  //digitalWrite(red, HIGH);
+}
+
 void setup(void){
   pinMode(red, OUTPUT);
   pinMode(yellow, OUTPUT);
-  pinMode(btn, INPUT_PULLUP);
+  pinMode(btn, INPUT);
   pinMode(bt2, INPUT_PULLUP);
   pinMode(bt3, INPUT_PULLUP);
   pinMode(bt4, INPUT_PULLUP);
   pinMode(r, OUTPUT);
   pinMode(g, OUTPUT);
   pinMode(b, OUTPUT);
+  attachInterrupt(0, foo, CHANGE);
 }
 
 #define FRQ 200
@@ -54,7 +60,7 @@ void loop(void){
     blink(r);
   }
   else blink(b);*/
-  onIfon(bt2, r);
+  //onIfon(bt2, r);
   onIfon(bt3, g);
   onIfon(bt4, b);
 }
@@ -75,7 +81,7 @@ void main(void){
   nonblock(NB_ENABLE);
   init();
   setup();
-  printf("%d  %p\n", sim.id == UNO, diods[1].pin);
+  printf("%d %d, %d %p\n", sim.canInterrupt[0] == &sim.pins[2], sim.pins[2].canInterrupt, sim.pins[2].interruptMode, sim.pins[2].interrFun);
   //return;
   launchThreads();
 }

@@ -6,8 +6,7 @@
 #define DISPLAY_FREQ 50*1000
 
 // constants
-#define LOW 0
-#define HIGH 1
+
 
 #define UNO 0
 
@@ -19,27 +18,43 @@ typedef int Bool;
 typedef enum {
   OUTPUT,
   INPUT,
+  INPUT_PULLUP, // will amount to setting HIGH as initial state
   INTERRUPT,
   MODE_NONE
 } PinMode;
-#define INPUT_PULLUP INPUT
 
-  // ^ since not relevant to the simulator
+typedef enum {
+  LOW,
+  FALLING,
+  RISING,
+  CHANGE,
+  NO_INTERR
+} InterruptMode;
+
+#define LOW 0
+#define HIGH 1
 
 typedef struct digitalPin {
   PinMode mode;
-  int value; // HIGH or LOW
-  Bool isAnalog;
-  Bool canInterrupt;
+  int value; // HIGH or LOW or 0-255
+  Bool isAnalog; // is the current value analog?
   Bool canAnalog;
+  Bool canInterrupt;
+  InterruptMode interruptMode;
+  void (*interrFun)(void);
 } DigitalPin;
 
 typedef struct arduino {
   int id;
   int val;
   DigitalPin pins[BIGN];
+  DigitalPin *canInterrupt[BIGN];
   int minDigital;
   int maxDigital;
+  DigitalPin *interrupts[BIGN];
+  int nextInterrupt;
+  int freeInterrupt;
+  Bool interrupted;
 } Arduino;
 
 typedef struct diod
@@ -51,6 +66,7 @@ typedef struct diod
 typedef struct button
 {
   char name[SIZE_NAME];
+  Bool isPressed;
   DigitalPin *pin;
   char key;
 } Button;
@@ -74,14 +90,15 @@ void diodRGB(int rIx, int gIx, int bIx, char *name);
 
 void loop(void);
 
-
-
 void delay(int ms);
 
 void pinMode(int pinIx, PinMode mode);
+
+void attachInterrupt(int interrIx, void (*interrFun)(void), InterruptMode mode);
 void digitalWrite(int pinIx, int value);
 int digitalRead(int pinIx);
 void analogWrite(int pinIx, int value);
+
 
 // internals
 Bool checkDigital(int pinIx);
@@ -96,8 +113,16 @@ void launchThreads(void);
       int getMainColor(int r, int g, int b);
       int getMix(int mainColor, int r, int g, int b);
       void state2Str(DigitalPin *pin, char* str);
+  
   void *threadLoop(void *_);
+  
+  void *threadInterruptions(void *_);
+    void digitalChange(DigitalPin *pin, int newValue);
+    #define SWITCH 2
+    void addInterrupt(DigitalPin *pin);
+
   void *threadListener(void *_);
+
 
 #define NB_ENABLE 0
 #define NB_DISABLE 1
@@ -110,3 +135,12 @@ Bool kbhit(void);
 #define max(a, b) (a > b ? a : b)
 
 #endif // FILE_ASIM // wrapper
+
+
+
+
+// TODO:
+// cases:
+  // calling write/read/analog for wrong types
+  // defining a button/diod/etc for wrong type
+  // 
