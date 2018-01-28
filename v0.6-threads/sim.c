@@ -3,50 +3,32 @@
 
 #include <sys/ioctl.h> // ioctl, TIOCGWINSZ
 #include <unistd.h> // usleep
-//#include <pthread.h> // pthread_t
+#include <pthread.h> // pthread_t
 
 #include "sim.h"
 
 
 
 // globals
-Simulation *sim;
-
-#include <stdlib.h>
-#include <sys/mman.h>
-
-void* create_shared_memory(size_t size) {
-  // Our memory buffer will be readable and writable:
-  int protection = PROT_READ | PROT_WRITE;
-
-  // The buffer will be shared (meaning other processes can access it), but
-  // anonymous (meaning third-party processes cannot obtain an address for it),
-  // so only this process and its children will be able to use it:
-  int visibility = MAP_ANONYMOUS | MAP_SHARED;
-
-  // The remaining parameters to `mmap()` are not important for this use case,
-  // but the manpage for `mmap` explains their purpose.
-  return mmap(NULL, size, protection, visibility, 0, 0);
-}
+Arduino sim;
+Diod diods[BIGN];
+int diodCount = 0;
+Button buttons[BIGN];
+int buttonCount = 0;
+DiodRGB diodRGBs[BIGN];
+int diodRGBCount = 0;
 
 void setSim(int id){
   int i;
 
-  sim = (Simulation *)create_shared_memory(sizeof(Simulation));
-  // TODO check if the allocation worked?
-
-  sim->diodCount = 0;
-  sim->diodRGBCount = 0;
-  sim->buttonCount = 0;
-
-  sim->ard.id = id;
-  sim->ard.nextInterrupt = -1;
-  sim->ard.freeInterrupt = 0;
-  sim->ard.interrupted = 0;
+  sim.id = id;
+  sim.nextInterrupt = -1;
+  sim.freeInterrupt = 0;
+  sim.interrupted = 0;
 
   DigitalPin *pin;
   for(i = 0; i < BIGN; i++){
-    pin = &sim->ard.pins[i];
+    pin = &sim.pins[i];
     pin->mode = MODE_NONE;
     pin->value = LOW;
     pin->isAnalog = 0;
@@ -55,29 +37,27 @@ void setSim(int id){
     pin->interrFun = NULL;
     pin->canAnalog = 1; // will depend
 
-    sim->ard.canInterrupt[i] = NULL;
+    sim.canInterrupt[i] = NULL;
   }
 
   if (id == UNO) {
-    sim->ard.minDigital = 0;
-    sim->ard.maxDigital = 10;
+    sim.minDigital = 0;
+    sim.maxDigital = 10;
 
-    sim->ard.canInterrupt[0] = &sim->ard.pins[2];
-    sim->ard.canInterrupt[1] = &sim->ard.pins[3];
-    sim->ard.pins[2].canInterrupt = 1;
-    sim->ard.pins[3].canInterrupt = 1;
+    sim.canInterrupt[0] = &sim.pins[2];
+    sim.canInterrupt[1] = &sim.pins[3];
+    sim.pins[2].canInterrupt = 1;
+    sim.pins[3].canInterrupt = 1;
   }
 }
 
-#ifdef WAWA
-
 void diod(int pinIx, char *name){
-  if (sim->diodCount >= BIGN || !checkDigital(pinIx)) {
+  if (diodCount >= BIGN || !checkDigital(pinIx)) {
     return; // ERROR
   }
   
-  Diod *diod = &sim->diods[sim->diodCount];
-  ++sim->diodCount;
+  Diod *diod = &diods[diodCount];
+  ++diodCount;
   setDisplayName(diod->name, name);
   diod->pin = &sim.pins[pinIx];
 }
@@ -201,8 +181,13 @@ void setDisplayName(char *dest, char *src){
 
 
 
-void launchProcesses(void){
-  
+void launchThreads(void){
+  pthread_t tid;
+  //pthread_create(&tid, NULL, threadDisplay, NULL);
+  pthread_create(&tid, NULL, threadLoop, NULL);
+  pthread_create(&tid, NULL, threadListener, NULL);
+  pthread_create(&tid, NULL, threadInterruptions, NULL);
+  pthread_exit(NULL);
   return;
 }
 
@@ -476,7 +461,6 @@ void *threadListener(void *_){
     }
   }
 }
-#endif
 
 #include <termios.h>
 #include <stdlib.h>
@@ -516,3 +500,4 @@ Bool kbhit(void)
     select(STDIN_FILENO+1, &fds, NULL, NULL, &tv);
     return FD_ISSET(STDIN_FILENO, &fds);
 }
+

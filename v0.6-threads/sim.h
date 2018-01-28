@@ -79,17 +79,6 @@ typedef struct diodRGB
   DigitalPin *blue;
 } DiodRGB;
 
-typedef struct simulation
-{
-  Arduino ard;
-  Diod diods[BIGN];
-  int diodCount;
-  Button buttons[BIGN];
-  int buttonCount;
-  DiodRGB diodRGBs[BIGN];
-  int diodRGBCount;
-} Simulation;
-
 
 
 // functions
