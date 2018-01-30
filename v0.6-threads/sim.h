@@ -143,4 +143,4 @@ Bool kbhit(void);
 // cases:
   // calling write/read/analog for wrong types
   // defining a button/diod/etc for wrong type
-  // 
+  // handle pullup thing better
