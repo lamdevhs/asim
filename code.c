@@ -3,12 +3,14 @@
 #include <stdio.h>
 #ifdef __ASIM__
   #include "sim.h"
+  #include <signal.h> // signal, SIGUSR1
 #endif
-#include "bases.h"
+#include "code.h"
 
 // tmp
 extern Arduino sim;
 extern Diod diods[];
+extern int waaa;
 
 // to make it work:
 int red = 0, yellow = 1, btn = 2;
@@ -17,9 +19,13 @@ int bt2 = 6;
 int bt3 = 7;
 int bt4 = 8;
 
+
+int redval = LOW;
 void foo(void){
-  printf("waa\n");
-  //digitalWrite(red, HIGH);
+  //printf("waa\n");
+  redval = 1 - redval;
+  digitalWrite(red, redval);
+  delay(5000);
 }
 
 void setup(void){
@@ -53,7 +59,7 @@ void onIfon(int inPin, int outPin){
   int in = digitalRead(inPin);
   digitalWrite(outPin, in);
 }
-
+int yval = LOW;
 void loop(void){
   /*int bst = digitalRead(btn);
   if (bst == HIGH) {
@@ -61,8 +67,12 @@ void loop(void){
   }
   else blink(b);*/
   //onIfon(bt2, r);
-  onIfon(bt3, g);
-  onIfon(bt4, b);
+  //onIfon(bt3, g);
+  //onIfon(bt4, b);
+  waaa = delay(5000);
+  yval = 1 - yval;
+  digitalWrite(yellow, yval);
+  while(1){}
 }
 
 #ifdef __ASIM__
@@ -81,7 +91,7 @@ void main(void){
   nonblock(NB_ENABLE);
   init();
   setup();
-  printf("%d %d, %d %p\n", sim.canInterrupt[0] == &sim.pins[2], sim.pins[2].canInterrupt, sim.pins[2].interruptMode, sim.pins[2].interrFun);
+  signal(SIGUSR1, iEventHandler);
   //return;
   launchThreads();
 }

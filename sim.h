@@ -1,3 +1,5 @@
+#include <pthread.h>
+
 #ifndef FILE_ASIM
 #define FILE_ASIM
 
@@ -25,6 +27,7 @@ typedef enum {
 
 typedef enum {
   LOW,
+  HIGH,
   FALLING,
   RISING,
   CHANGE,
@@ -40,20 +43,35 @@ typedef struct digitalPin {
   Bool isAnalog; // is the current value analog?
   Bool canAnalog;
   Bool canInterrupt;
-  InterruptMode interruptMode;
+  int interrIx;
+  InterruptMode interrMode;
   void (*interrFun)(void);
 } DigitalPin;
+
+
+typedef struct ievent
+{
+  DigitalPin *pin;
+  struct ievent *next;
+  Bool dead; // signals the event has been taken care of
+} IEvent;
+
+typedef struct eventQueue
+{
+  IEvent *in; // where events are added
+  IEvent *out; // where events are treated and freed
+  int size;
+} IEventQueue;
 
 typedef struct arduino {
   int id;
   int val;
   DigitalPin pins[BIGN];
-  DigitalPin *canInterrupt[BIGN];
   int minDigital;
   int maxDigital;
   DigitalPin *interrupts[BIGN];
-  int nextInterrupt;
-  int freeInterrupt;
+  IEventQueue ieq;
+  pthread_t loopThread;
   Bool interrupted;
 } Arduino;
 
@@ -83,6 +101,7 @@ typedef struct diodRGB
 
 // functions
 void setSim(int type);
+void defineInterrupt(int pinIx, int interrId);
 
 void diod(int pinIx, char *name);
 void button(int pinIx, char *name, char key);
@@ -90,7 +109,7 @@ void diodRGB(int rIx, int gIx, int bIx, char *name);
 
 void loop(void);
 
-void delay(int ms);
+int delay(int ms);
 
 void pinMode(int pinIx, PinMode mode);
 
@@ -98,6 +117,7 @@ void attachInterrupt(int interrIx, void (*interrFun)(void), InterruptMode mode);
 void digitalWrite(int pinIx, int value);
 int digitalRead(int pinIx);
 void analogWrite(int pinIx, int value);
+int digitalPinToInterrupt(int pinIx);
 
 
 // internals
@@ -115,11 +135,13 @@ void launchThreads(void);
       void state2Str(DigitalPin *pin, char* str);
   
   void *threadLoop(void *_);
-  
+  /*
   void *threadInterruptions(void *_);
-    void digitalChange(DigitalPin *pin, int newValue);
+  */
+    void digitalChange(DigitalPin *pin, int newValue, int fromListener);
     #define SWITCH 2
     void addInterrupt(DigitalPin *pin);
+    void iEventHandler(int _);
 
   void *threadListener(void *_);
 
@@ -140,7 +162,17 @@ Bool kbhit(void);
 
 
 // TODO:
+// * !!!!!! setup must be launched AFTER the display + listener threads
+// * allow diodRGB to only have two or even one color, without
+// having to give dummy pin numbers
+
 // cases:
   // calling write/read/analog for wrong types
   // defining a button/diod/etc for wrong type
   // handle pullup thing better
+  // delay when sim.interrupted
+
+// check:
+  // what happens when you try to set the value
+  // of something connected to a button
+  // (if it's INPUT, in theory, it changes the pullup option value)

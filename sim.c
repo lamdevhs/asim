@@ -1,9 +1,12 @@
 #include <string.h>
 #include <stdio.h>
+#include <stdlib.h>
 
 #include <sys/ioctl.h> // ioctl, TIOCGWINSZ
 #include <unistd.h> // usleep
-#include <pthread.h> // pthread_t
+#include <pthread.h> // pthread_t, pthread_self
+
+#include <signal.h> // signal, SIGUSR1
 
 #include "sim.h"
 
@@ -18,12 +21,28 @@ int buttonCount = 0;
 DiodRGB diodRGBs[BIGN];
 int diodRGBCount = 0;
 
+
+int waaa = 0;
+int ieh = 0;
+
 void setSim(int id){
   int i;
 
   sim.id = id;
-  sim.nextInterrupt = -1;
-  sim.freeInterrupt = 0;
+
+    // dummy event, solely there to prevent
+    // the queue to ever be empty
+  IEvent *ie = (IEvent *)malloc(sizeof(IEvent));
+    // TODO check null ptr
+
+  ie->pin = NULL;
+  ie->next = NULL;
+  ie->dead = 1;
+
+  sim.ieq.in = ie;
+  sim.ieq.out = ie;
+  sim.ieq.size = 0;
+
   sim.interrupted = 0;
 
   DigitalPin *pin;
@@ -31,24 +50,33 @@ void setSim(int id){
     pin = &sim.pins[i];
     pin->mode = MODE_NONE;
     pin->value = LOW;
-    pin->isAnalog = 0;
-    pin->canInterrupt = 0; // will depend
-    pin->interruptMode = NO_INTERR;
-    pin->interrFun = NULL;
     pin->canAnalog = 1; // will depend
+    pin->isAnalog = 0;
 
-    sim.canInterrupt[i] = NULL;
+    pin->canInterrupt = 0; // will depend
+    pin->interrMode = NO_INTERR;
+    pin->interrIx = -1;
+    pin->interrFun = NULL;
+
+    sim.interrupts[i] = NULL;
   }
 
   if (id == UNO) {
     sim.minDigital = 0;
-    sim.maxDigital = 10;
-
-    sim.canInterrupt[0] = &sim.pins[2];
-    sim.canInterrupt[1] = &sim.pins[3];
-    sim.pins[2].canInterrupt = 1;
-    sim.pins[3].canInterrupt = 1;
+    sim.maxDigital = 20; // TOD temporary values
+    
+    defineInterrupt(2, 0);
+    defineInterrupt(3, 1);
   }
+}
+
+void defineInterrupt(int pinIx, int interrIx){
+  // TODO check range of input values
+  DigitalPin *pin = &sim.pins[pinIx];
+  sim.interrupts[interrIx] = pin;
+  sim.interrupts[1] = &sim.pins[3];
+  pin->canInterrupt = 1;
+  pin->interrIx = interrIx;
 }
 
 void diod(int pinIx, char *name){
@@ -92,10 +120,19 @@ void diodRGB(int rIx, int gIx, int bIx, char *name){
 
 
 
+int delay_original(int ms){
+  return usleep(ms * 1000);
+}
 
-
-void delay(int ms){
-  usleep(ms * 1000);
+int delay(int ms){
+  while(ms) {
+    int ans = usleep(10*1000);
+    if (ans != 0) {
+      // some error happened, probably signal
+      continue;
+    }
+    else ms -= 10;
+  }
 }
 
 
@@ -118,19 +155,20 @@ void pinMode(int pinIx, PinMode mode){
 void attachInterrupt(int interrIx, void (*interrFun)(void), InterruptMode mode){
   // check validity of mode
   if (interrIx < 0 || BIGN <= interrIx) return; // ERROR
-  DigitalPin *pin = sim.canInterrupt[interrIx];
+  DigitalPin *pin = sim.interrupts[interrIx];
   if (pin == NULL) return; // ERROR
   if (!pin->canInterrupt) return; // BUG!
   pin->interrFun = interrFun;
-  pin->interruptMode = mode;
+  pin->interrMode = mode;
 }
+
 
 void digitalWrite(int pinIx, int value){
   if (!checkDigital(pinIx) || sim.pins[pinIx].mode != OUTPUT) {
     return; // ERROR? or input pullup stuff? TODO
   }
   if (value != LOW && value != HIGH) return; // ERROR? or default value? TODO
-  digitalChange(&sim.pins[pinIx], value);
+  digitalChange(&sim.pins[pinIx], value, 0);
 }
 
 
@@ -156,6 +194,16 @@ void analogWrite(int pinIx, int value){
   pin->value = min(max(0, value), 255);
   pin->isAnalog = 1;
 }
+
+int digitalPinToInterrupt(int pinIx){
+  if (!checkDigital(pinIx)) return -1; //ERROR
+  DigitalPin *pin = &sim.pins[pinIx];
+  if (!pin->canInterrupt) return -1; //ERROR
+  return pin->interrIx;
+}
+
+
+
 
 Bool checkDigital(int pinIx){
   return (
@@ -183,10 +231,9 @@ void setDisplayName(char *dest, char *src){
 
 void launchThreads(void){
   pthread_t tid;
-  //pthread_create(&tid, NULL, threadDisplay, NULL);
+  pthread_create(&tid, NULL, threadDisplay, NULL);
   pthread_create(&tid, NULL, threadLoop, NULL);
   pthread_create(&tid, NULL, threadListener, NULL);
-  pthread_create(&tid, NULL, threadInterruptions, NULL);
   pthread_exit(NULL);
   return;
 }
@@ -201,6 +248,9 @@ void *threadDisplay(void *_) {
 }
 
 
+int printInterr();
+int printEv(IEvent *ie);
+
 void printDisplay(int row, int col){
   int curRow = 0;
   int curCol = 0;
@@ -208,7 +258,15 @@ void printDisplay(int row, int col){
 
   printNL; curRow++;
   
-  printf("interrs: %d, %d\n", sim.nextInterrupt, sim.freeInterrupt); curRow++;
+  //debug
+  int ls = printInterr();
+  curRow += ls;
+
+  if (sim.interrupted) printf("[[interruption]]\n");
+  else printf("\n");
+  curRow++;
+  
+  printf("waaa: %d\n", waaa); curRow++;
 
   // printing diods
   printf("diods:\n"); curRow++;
@@ -240,6 +298,34 @@ void printDisplay(int row, int col){
   for (; curRow < row - 1; curRow++){
     printNL;
   }
+}
+
+int printInterr(){
+  int ls = 0;
+  printf("output\n"); ++ls;
+  IEvent *ie = sim.ieq.out;
+  if (ie == NULL){
+    printf("!!! NULL\n");
+    return ++ls;
+  }
+  while(printEv(ie)){
+    ++ls;
+    ie = ie->next;
+    if (ie == NULL){
+      printf("NULL\n");
+      return ++ls;
+    }
+  }
+  return ++ls;
+}
+
+int printEv(IEvent *ie){
+  printf("in: %d, out: %d, dead: %d, next is null: %d\n",
+    ie == sim.ieq.in, ie == sim.ieq.out,
+    ie->dead, ie->next == NULL);
+
+  if (ie->next == NULL) return 0;
+  else return 1;
 }
 
 void printDiod(Diod *diod){
@@ -355,13 +441,14 @@ void state2Str(DigitalPin *pin, char *str){
 
 
 void *threadLoop(void *_) {
+  sim.loopThread = pthread_self();
   while (1) {
     loop();
     //usleep(1000 + DISPLAY_FREQ);
   }
 }
 
-
+/*
 void *threadInterruptions(void *_){
   while (1){
     continue;
@@ -385,24 +472,27 @@ void *threadInterruptions(void *_){
     }
   }
 }
-
+*/
 
 // interruptions
-void digitalChange(DigitalPin *pin, int newValue){
+void digitalChange(DigitalPin *pin, int newValue, int fromListener){
   int oldValue = pin->value;
   if (newValue == SWITCH) newValue = (oldValue == 0);
   
   pin->value = newValue;
   pin->isAnalog = 0;
+  if (!fromListener) return;
+    // ^ for now we don't allow interruptions
+    // triggered from loopThread
 
   if (pin->canInterrupt) {
     int changed = (newValue != oldValue);
-    InterruptMode mode = pin->interruptMode;
+    InterruptMode mode = pin->interrMode;
 
     if (mode == NO_INTERR) return;
 
-    else if (mode == LOW){
-      if (newValue == LOW) addInterrupt(pin);
+    else if (mode == LOW || mode == HIGH){
+      if (newValue == mode) addInterrupt(pin);
     }
     else if (!changed) return;
 
@@ -412,40 +502,86 @@ void digitalChange(DigitalPin *pin, int newValue){
     else if (mode == FALLING) {
       if (newValue == LOW) addInterrupt(pin);
     }
-    else addInterrupt(pin);
-      // ^ mode == CHANGE (presumably)
+    else if (mode == CHANGE) addInterrupt(pin);
+
+    else return; // BUG wrong value
+    //pthread_kill(sim.loopThread, SIGUSR1);
   }
 }
 
 void addInterrupt(DigitalPin *pin){
   if (!pin->canInterrupt) return; // BUG!
-  if (sim.freeInterrupt >= BIGN) return; // BUG!
 
-  if (sim.freeInterrupt < 0) return;
-    // ^ indicates interrupt memory full! PROBLEM
+  IEvent *ie = (IEvent *)malloc(sizeof(IEvent));
+    // ^ this variable name already being cursed
+    // i won't bother checking for null pointer
+    // TODO
 
-  sim.interrupts[sim.freeInterrupt] = pin;
-  if (sim.nextInterrupt == -1) {
-    sim.nextInterrupt = sim.freeInterrupt;
-  }
-  sim.freeInterrupt = (sim.freeInterrupt + 1) % BIGN;
-  if (sim.freeInterrupt == sim.nextInterrupt) {
-    // filled memory!
-    sim.freeInterrupt = -1;
-  }
+  ie->pin = pin;
+  ie->next = NULL;
+  ie->dead = 0;
+  sim.ieq.in->next = ie;
+  sim.ieq.in = ie;
+    // in theory sim.ieq.in is always meant to be filled
+    // by at least one event
+  ++sim.ieq.size;
 
-  printf("addInterrupt: %d %d\n", sim.freeInterrupt, sim.nextInterrupt); //&&&&&&&
+  pthread_kill(sim.loopThread, SIGUSR1);
+
+  //printf("addInterrupt: %d %d\n", sim.freeInterrupt, sim.nextInterrupt); //&&&&&&&
+  
 }
 
+void iEventHandler(int _){
+  sim.interrupted = 1;
+  while(1) {
+    IEvent *ie = sim.ieq.out;
+    // TODO: test the pin is the right kind
+    // test out is not NULL, etc
+    if (ie->dead) {
+      // BUG?
+
+    }
+    else { // take care of it
+      ie->dead = 1;
+      ie->pin->interrFun();
+
+      // we check that after interrFun in case that one
+      // were meant to modify the mode of that pin
+      InterruptMode mode = ie->pin->interrMode;
+      if (mode == LOW || mode == HIGH)
+        if (mode == ie->pin->value) {
+          // TODO the case of analog is bleh
+          ie->dead = 1; // don't delete the current event
+      }
+      else {
+        --sim.ieq.size;
+      }
+    }
+    
+    
+    if (ie->dead) {
+      if (ie->next != NULL) {
+        // physically delete it only if
+        // ieq won't end up empty bc of it
+        sim.ieq.out = ie->next;
+        free(ie);
+        continue;
+      }
+      else { // we took care of all events
+        break;
+      }
+    }
+  }
+  sim.interrupted = 0;
+}
 
 
 void *threadListener(void *_){
   int i;
   char c;
   Button *button;
-  int pinIx;
-  usleep(5000*1000);
-  printf("listening\n");
+  //int pinIx;
   while (1) {
     //while(!kbhit());
     c = fgetc(stdin);
@@ -454,8 +590,8 @@ void *threadListener(void *_){
     for (i = 0; i < buttonCount; i++){
       button = &buttons[i];
       if (button->key == c) {
-        pinIx = button->pin - sim.pins;
-        digitalChange(button->pin, SWITCH);
+        //pinIx = button->pin - sim.pins;
+        digitalChange(button->pin, SWITCH, 1);
         button->isPressed = 1 - button->isPressed;
       }
     }
