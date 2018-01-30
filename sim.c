@@ -20,6 +20,8 @@ Button buttons[BIGN];
 int buttonCount = 0;
 DiodRGB diodRGBs[BIGN];
 int diodRGBCount = 0;
+Traffic traffics[BIGN];
+int trafficCount = 0;
 
 
 int waaa = 0;
@@ -116,6 +118,21 @@ void diodRGB(int rIx, int gIx, int bIx, char *name){
   diodRGB->red = &sim.pins[rIx];
   diodRGB->green = &sim.pins[gIx];
   diodRGB->blue = &sim.pins[bIx];
+}
+
+void traffic(int rIx, int yIx, int gIx, char *name){
+  if (trafficCount >= BIGN ||
+    !checkDigital(rIx) ||
+    !checkDigital(yIx) ||
+    !checkDigital(gIx)) {
+    return; // ERROR
+  }
+  Traffic *traffic = &traffics[trafficCount];
+  ++trafficCount;
+  setDisplayName(traffic->name, name);
+  traffic->red = &sim.pins[rIx];
+  traffic->yellow = &sim.pins[yIx];
+  traffic->green = &sim.pins[gIx];
 }
 
 
@@ -276,11 +293,18 @@ void printDisplay(int row, int col){
     curRow++;
   }
 
-  // printing buttons
+  // printing rgb diods
   printf("RGB diods:\n"); curRow++;
   for (i = 0; i < diodRGBCount && curRow < row - 1; i++){
     printTAB;
     printDiodRGB(&diodRGBs[i]);
+    curRow++;
+  }
+
+  printf("Traffic diods:\n"); curRow++;
+  for (i = 0; i < trafficCount && curRow < row - 1; i++){
+    printTAB;
+    printTraffic(&traffics[i]);
     curRow++;
   }
 
@@ -342,6 +366,18 @@ void printButton(Button *button){
     button->isPressed ? "(pressed)" : "");
   printNL;
 }
+
+void printTraffic(Traffic *traffic){
+  printf("%s ->", traffic->name);
+  if (traffic->red->value != 0)
+    printf(" RED ");
+  if (traffic->yellow->value != 0)
+    printf(" ORANGE ");
+  if (traffic->green->value != 0)
+    printf(" GREEN ");
+  printf("\n");
+}
+
 
 char colorNames[][8] = {
   "white",

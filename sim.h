@@ -97,6 +97,13 @@ typedef struct diodRGB
   DigitalPin *blue;
 } DiodRGB;
 
+typedef struct traffic
+{
+  char name[SIZE_NAME];
+  DigitalPin *red;
+  DigitalPin *yellow;
+  DigitalPin *green;
+} Traffic;
 
 
 // functions
@@ -106,6 +113,7 @@ void defineInterrupt(int pinIx, int interrId);
 void diod(int pinIx, char *name);
 void button(int pinIx, char *name, char key);
 void diodRGB(int rIx, int gIx, int bIx, char *name);
+void traffic(int rIx, int yIx, int gIx, char *name);
 
 void loop(void);
 
@@ -129,6 +137,7 @@ void launchThreads(void);
     void printDisplay(int row, int col);
       void printDiod(Diod *diod);
       void printButton(Button *button);
+      void printTraffic(Traffic *traffic);
       void printDiodRGB(DiodRGB *diodRGB);
       int getMainColor(int r, int g, int b);
       int getMix(int mainColor, int r, int g, int b);

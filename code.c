@@ -19,6 +19,10 @@ int bt2 = 6;
 int bt3 = 7;
 int bt4 = 8;
 
+int tR = 9;
+int tY = 10;
+int tG = 11;
+
 
 int redval = LOW;
 void foo(void){
@@ -31,17 +35,23 @@ void foo(void){
 void setup(void){
   pinMode(red, OUTPUT);
   pinMode(yellow, OUTPUT);
+  // buttons
   pinMode(btn, INPUT);
   pinMode(bt2, INPUT_PULLUP);
   pinMode(bt3, INPUT_PULLUP);
   pinMode(bt4, INPUT_PULLUP);
+  // diod rgb
   pinMode(r, OUTPUT);
   pinMode(g, OUTPUT);
   pinMode(b, OUTPUT);
+  // traffic
+  pinMode(tR, OUTPUT);
+  pinMode(tY, OUTPUT);
+  pinMode(tG, OUTPUT);
   attachInterrupt(0, foo, CHANGE);
 }
 
-#define FRQ 200
+#define FRQ 300
 void blink(int pin){
   digitalWrite(pin, HIGH);
   delay(FRQ);
@@ -59,6 +69,7 @@ void onIfon(int inPin, int outPin){
   int in = digitalRead(inPin);
   digitalWrite(outPin, in);
 }
+
 int yval = LOW;
 void loop(void){
   /*int bst = digitalRead(btn);
@@ -69,10 +80,15 @@ void loop(void){
   //onIfon(bt2, r);
   //onIfon(bt3, g);
   //onIfon(bt4, b);
-  waaa = delay(5000);
+  waaa = delay(1000);
   yval = 1 - yval;
   digitalWrite(yellow, yval);
-  while(1){}
+  digitalWrite(tR, HIGH);
+  while(1){
+    //blink(tR);
+    blink(tY);
+    blink(tG);
+  }
 }
 
 #ifdef __ASIM__
@@ -85,6 +101,7 @@ void init(void){
   button(bt3, "green", 'g');
   button(bt4, "blue", 'b');
   diodRGB(r, g, b, "foo");
+  traffic(tR, tY, tG, "horizon");
 }
 
 void main(void){
