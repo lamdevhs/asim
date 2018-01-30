@@ -79,6 +79,17 @@ typedef struct diodRGB
   DigitalPin *blue;
 } DiodRGB;
 
+typedef struct simulation
+{
+  Arduino ard;
+  Diod diods[BIGN];
+  int diodCount;
+  Button buttons[BIGN];
+  int buttonCount;
+  DiodRGB diodRGBs[BIGN];
+  int diodRGBCount;
+} Simulation;
+
 
 
 // functions
@@ -143,4 +154,4 @@ Bool kbhit(void);
 // cases:
   // calling write/read/analog for wrong types
   // defining a button/diod/etc for wrong type
-  // handle pullup thing better
+  // 
