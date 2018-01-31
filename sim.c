@@ -140,14 +140,15 @@ void traffic(int rIx, int yIx, int gIx, char *name){
   traffic->green = &sim.pins[gIx];
 }
 
-void mkRegister(int valIx, int pushIx, int sendIx, char *name, int size, int help){
+int mkRegister(int valIx, int pushIx, int sendIx, char *name, int size, int help){
   if (registerCount >= BIGN ||
     !checkDigital(valIx) ||
     !checkDigital(pushIx) ||
     !checkDigital(sendIx)) {
-    return; // ERROR
+    return -1; // ERROR
   }
-  Register *reg = &registers[registerCount];
+  int ix = registerCount;
+  Register *reg = &registers[ix];
   ++registerCount;
   setDisplayName(reg->name, name);
   reg->value = &sim.pins[valIx];
@@ -158,11 +159,20 @@ void mkRegister(int valIx, int pushIx, int sendIx, char *name, int size, int hel
   reg->output = (int *)malloc(size*sizeof(int));
     // ^ TODO make sure they're zero-initialized
   reg->help = help;
+  reg->printer = NULL;
 
   reg->push->onChange = registerPush;
   reg->push->onChangeArg = reg;
   reg->send->onChange = registerSend;
   reg->send->onChangeArg = reg;
+  return ix;
+}
+
+void digitalDisplay(int valIx, int pushIx, int sendIx, char *name){
+  int ix = mkRegister(valIx, pushIx, sendIx, name, 16, 0);
+  if (ix <= 0) return; // ERROR
+  Register *reg = &registers[ix];
+  reg->printer = printDigitalDisplay;
 }
 
 
@@ -334,8 +344,13 @@ void printDisplay(int row, int col){
   printf("registers:\n"); curRow++;
   for (i = 0; i < registerCount && curRow < row - 1; i++){
     printTAB;
-    printRegister(&registers[i]);
-    curRow++;
+    if (registers[i].printer != NULL) {
+      curRow += registers[i].printer(&registers[i]);
+    }
+    else {
+      printRegister(&registers[i]);
+      curRow++;
+    }
   }
 
   printf("Traffic diods:\n"); curRow++;
@@ -444,6 +459,59 @@ void printRegister(Register * reg){
   printList(reg->output, reg->size);
   printf("\n");
 }
+
+
+int printDigitalDisplay(Register * reg){
+  printf("%s:\n", reg->name);
+  // first line
+  printTAB;
+  printf(" ");
+  if (reg->output[0]) printf("_");
+  else printf(" ");
+  printf("   ");
+  if (reg->output[0 + 8]) printf("_");
+  else printf(" ");
+  printNL;
+  // line 2
+  printTAB;
+  if (reg->output[5]) printf("|");
+  else printf(" ");
+  if (reg->output[6]) printf("_");
+  else printf(" ");
+  if (reg->output[1]) printf("|");
+  else printf(" ");
+  printf("  ");
+  if (reg->output[5+8]) printf("|");
+  else printf(" ");
+  if (reg->output[6+8]) printf("_");
+  else printf(" ");
+  if (reg->output[1+8]) printf("|");
+  else printf(" ");
+  printNL;
+  // line 3
+  printTAB;
+  if (reg->output[4]) printf("|");
+  else printf(" ");
+  if (reg->output[3]) printf("_");
+  else printf(" ");
+  if (reg->output[2]) printf("|");
+  else printf(" ");
+  if (reg->output[7]) printf(".");
+  else printf(" ");
+  printf(" ");
+  if (reg->output[4+8]) printf("|");
+  else printf(" ");
+  if (reg->output[3+8]) printf("_");
+  else printf(" ");
+  if (reg->output[2+8]) printf("|");
+  else printf(" ");
+  if (reg->output[7+8]) printf(".");
+  else printf(" ");
+  printNL;
+
+  return 4; // number of lines printed
+}
+
 
 
 char colorNames[][8] = {

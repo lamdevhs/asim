@@ -81,7 +81,7 @@ void onIfon(int inPin, int outPin){
 
 int yval = LOW;
 
-#define REGSIZE 5
+#define REGSIZE 16
 int regVal = 0;
 int regCount = 0;
 
@@ -133,7 +133,7 @@ void init(void){
   button(bt4, "blue", 'b');
   diodRGB(r, g, b, "foo");
   traffic(tR, tY, tG, "horizon");
-  mkRegister(rg1, rg2, rg3, "myreg", REGSIZE, 1);
+  digitalDisplay(rg1, rg2, rg3, "myreg");
 }
 
 void main(void){

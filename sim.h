@@ -119,6 +119,7 @@ typedef struct reg
   int *input;
 
   Bool help; // set to 1 if you want to display input too
+  int (*printer)(struct reg * reg); // special display
 } Register;
 
 
@@ -130,7 +131,8 @@ void diod(int pinIx, char *name);
 void button(int pinIx, char *name, char key);
 void diodRGB(int rIx, int gIx, int bIx, char *name);
 void traffic(int rIx, int yIx, int gIx, char *name);
-void mkRegister(int valIx, int pushIx, int sendIx, char *name, int size, int help);
+int mkRegister(int valIx, int pushIx, int sendIx, char *name, int size, int help);
+void digitalDisplay(int valIx, int pushIx, int sendIx, char *name);
 
 void loop(void);
 
@@ -158,9 +160,11 @@ void launchThreads(void);
       void printButton(Button *button);
       void printTraffic(Traffic *traffic);
       void printRegister(Register * reg);
+        int printDigitalDisplay(Register * reg);
       void printDiodRGB(DiodRGB *diodRGB);
         int getMainColor(int r, int g, int b);
         int getMix(int mainColor, int r, int g, int b);
+
         
   
   void *threadLoop(void *_);
@@ -214,3 +218,4 @@ Bool kbhit(void);
   // what happens when you try to set the value
   // of something connected to a button
   // (if it's INPUT, in theory, it changes the pullup option value)
+
