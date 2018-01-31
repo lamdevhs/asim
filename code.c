@@ -154,15 +154,27 @@ void loop(void){
   yvar = (yvar + 1) % COLN;
 }
 
+
+
+enum colorss {
+  cred,
+  cblue,
+  cblack,
+  cgreen
+};
+
 int colorz(int val) {
   switch (val) {
-    case 0: printf("red"); break;
-    case 1: printf("blue"); break;
-    case 2: printf("black"); break;
-    case 3: printf("green"); break;
+    // case 0: printf("red"); break;
+    // case 1: printf("blue"); break;
+    // case 2: printf("black"); break;
+    // case 3: printf("green"); break;
+    SYMCASE(cred);
+    SYMCASE(cblue);
+    SYMCASE(cblack);
+    SYMCASE(cgreen);
     default: return -1;
   }
-
 }
 
 #ifdef __ASIM__

@@ -127,9 +127,10 @@ typedef struct spied
   char name[SIZE_NAME];
   int *pointer;
   int (*printer)(int value);
-  // char symbols[BIGN][SIZE_NAME];
-  // int symbolLimit;
+
 } Spied;
+#define SYMCASE(sym) case sym: printf(#sym); break
+ // ^ to be used with enumerations, a switch, and Spied.printer
 
 
 // functions
