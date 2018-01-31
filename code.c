@@ -23,6 +23,11 @@ int tR = 9;
 int tY = 10;
 int tG = 11;
 
+// register
+int rg1 = 12;
+int rg2 = 13;
+int rg3 = 14;
+
 
 int redval = LOW;
 void foo(void){
@@ -48,6 +53,10 @@ void setup(void){
   pinMode(tR, OUTPUT);
   pinMode(tY, OUTPUT);
   pinMode(tG, OUTPUT);
+  // register
+  pinMode(rg1, OUTPUT);
+  pinMode(rg2, OUTPUT);
+  pinMode(rg3, OUTPUT);
   attachInterrupt(0, foo, CHANGE);
 }
 
@@ -71,6 +80,27 @@ void onIfon(int inPin, int outPin){
 }
 
 int yval = LOW;
+
+#define REGSIZE 5
+int regVal = 0;
+int regCount = 0;
+
+void pushReg(){
+  //printf("\n");
+  digitalWrite(rg1, (++regVal % 2) && (regVal % 3));
+  ++regCount;
+  digitalWrite(rg2, LOW);
+  digitalWrite(rg2, HIGH);
+  digitalWrite(rg2, LOW);
+  if (regCount == REGSIZE) {
+    digitalWrite(rg3, LOW);
+    digitalWrite(rg3, HIGH);
+    digitalWrite(rg3, LOW);
+    delay(1000);
+    regCount = 0;
+  }
+}
+
 void loop(void){
   /*int bst = digitalRead(btn);
   if (bst == HIGH) {
@@ -88,6 +118,7 @@ void loop(void){
     //blink(tR);
     blink(tY);
     blink(tG);
+    pushReg();
   }
 }
 
@@ -102,6 +133,7 @@ void init(void){
   button(bt4, "blue", 'b');
   diodRGB(r, g, b, "foo");
   traffic(tR, tY, tG, "horizon");
+  mkRegister(rg1, rg2, rg3, "myreg", REGSIZE, 1);
 }
 
 void main(void){

@@ -22,6 +22,8 @@ DiodRGB diodRGBs[BIGN];
 int diodRGBCount = 0;
 Traffic traffics[BIGN];
 int trafficCount = 0;
+Register registers[BIGN];
+int registerCount = 0;
 
 
 int waaa = 0;
@@ -59,6 +61,9 @@ void setSim(int id){
     pin->interrMode = NO_INTERR;
     pin->interrIx = -1;
     pin->interrFun = NULL;
+
+    pin->onChange = NULL;
+    pin->onChangeArg = NULL;
 
     sim.interrupts[i] = NULL;
   }
@@ -133,6 +138,31 @@ void traffic(int rIx, int yIx, int gIx, char *name){
   traffic->red = &sim.pins[rIx];
   traffic->yellow = &sim.pins[yIx];
   traffic->green = &sim.pins[gIx];
+}
+
+void mkRegister(int valIx, int pushIx, int sendIx, char *name, int size, int help){
+  if (registerCount >= BIGN ||
+    !checkDigital(valIx) ||
+    !checkDigital(pushIx) ||
+    !checkDigital(sendIx)) {
+    return; // ERROR
+  }
+  Register *reg = &registers[registerCount];
+  ++registerCount;
+  setDisplayName(reg->name, name);
+  reg->value = &sim.pins[valIx];
+  reg->push = &sim.pins[pushIx];
+  reg->send = &sim.pins[sendIx];
+  reg->size = size;
+  reg->input = (int *)malloc(size*sizeof(int));
+  reg->output = (int *)malloc(size*sizeof(int));
+    // ^ TODO make sure they're zero-initialized
+  reg->help = help;
+
+  reg->push->onChange = registerPush;
+  reg->push->onChangeArg = reg;
+  reg->send->onChange = registerSend;
+  reg->send->onChangeArg = reg;
 }
 
 
@@ -301,6 +331,13 @@ void printDisplay(int row, int col){
     curRow++;
   }
 
+  printf("registers:\n"); curRow++;
+  for (i = 0; i < registerCount && curRow < row - 1; i++){
+    printTAB;
+    printRegister(&registers[i]);
+    curRow++;
+  }
+
   printf("Traffic diods:\n"); curRow++;
   for (i = 0; i < trafficCount && curRow < row - 1; i++){
     printTAB;
@@ -375,6 +412,16 @@ void printTraffic(Traffic *traffic){
     printf(" ORANGE ");
   if (traffic->green->value != 0)
     printf(" GREEN ");
+  printf("\n");
+}
+
+void printRegister(Register * reg){
+  printf("%s: ", reg->name);
+  if (reg->help) {
+    printList(reg->input, reg->size);
+    printf(" -> ");
+  }
+  printList(reg->output, reg->size);
   printf("\n");
 }
 
@@ -517,6 +564,12 @@ void digitalChange(DigitalPin *pin, int newValue, int fromListener){
   
   pin->value = newValue;
   pin->isAnalog = 0;
+
+  if (pin->onChange != NULL) {
+    //printf("change!\n");
+    pin->onChange(pin->onChangeArg, pin, oldValue);
+  }
+
   if (!fromListener) return;
     // ^ for now we don't allow interruptions
     // triggered from loopThread
@@ -634,6 +687,48 @@ void *threadListener(void *_){
   }
 }
 
+
+
+void registerPush(void *reg, DigitalPin *pin, int oldVal){
+  Register *r = (Register *)reg;
+  if (oldVal == LOW && pin->value == HIGH) {
+    shiftList(r->input, r->size, r->value->value);
+  }
+}
+void registerSend(void *reg, DigitalPin *pin, int oldVal){
+  Register *r = (Register *)reg;
+  if (oldVal == LOW && pin->value == HIGH) {
+    copyList(r->input, r->output, r->size);
+  }
+}
+
+void shiftList(int *xs, int size, int val){
+  int i;
+  for (i = 1; i < size; i++){
+    xs[size - i] = xs[size - i - 1];
+  }
+  xs[0] = val;
+}
+
+void copyList(int *xs, int *into, int size){
+  int i;
+  for (i = 0; i < size; i++){
+    into[i] = xs[i];
+  }
+}
+
+void printList(int *xs, int size){
+  int i;
+  for (i = 0; i < size - 1; i++){
+    printf("%d ", xs[i]);
+  }
+  printf("%d", xs[size - 1]);
+}
+
+
+
+
+
 #include <termios.h>
 #include <stdlib.h>
 
@@ -672,4 +767,3 @@ Bool kbhit(void)
     select(STDIN_FILENO+1, &fds, NULL, NULL, &tv);
     return FD_ISSET(STDIN_FILENO, &fds);
 }
-

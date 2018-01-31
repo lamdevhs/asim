@@ -46,6 +46,9 @@ typedef struct digitalPin {
   int interrIx;
   InterruptMode interrMode;
   void (*interrFun)(void);
+
+  void (*onChange)(void *arg, struct digitalPin *pin, int oldVal);
+  void *onChangeArg;
 } DigitalPin;
 
 
@@ -105,6 +108,19 @@ typedef struct traffic
   DigitalPin *green;
 } Traffic;
 
+typedef struct reg
+{
+  char name[SIZE_NAME];
+  DigitalPin *value;
+  DigitalPin *push;
+  DigitalPin *send;
+  int size;
+  int *output;
+  int *input;
+
+  Bool help; // set to 1 if you want to display input too
+} Register;
+
 
 // functions
 void setSim(int type);
@@ -114,6 +130,7 @@ void diod(int pinIx, char *name);
 void button(int pinIx, char *name, char key);
 void diodRGB(int rIx, int gIx, int bIx, char *name);
 void traffic(int rIx, int yIx, int gIx, char *name);
+void mkRegister(int valIx, int pushIx, int sendIx, char *name, int size, int help);
 
 void loop(void);
 
@@ -139,6 +156,7 @@ void launchThreads(void);
       void printButton(Button *button);
       void printTraffic(Traffic *traffic);
       void printDiodRGB(DiodRGB *diodRGB);
+      void printRegister(Register * reg);
       int getMainColor(int r, int g, int b);
       int getMix(int mainColor, int r, int g, int b);
       void state2Str(DigitalPin *pin, char* str);
@@ -154,6 +172,13 @@ void launchThreads(void);
 
   void *threadListener(void *_);
 
+
+void registerPush(void *reg, DigitalPin *pin, int oldVal);
+void registerSend(void *reg, DigitalPin *pin, int oldVal);
+
+void shiftList(int *xs, int size, int val);
+void copyList(int *xs, int *into, int size);
+void printList(int *xs, int size);
 
 #define NB_ENABLE 0
 #define NB_DISABLE 1
@@ -174,6 +199,7 @@ Bool kbhit(void);
 // * !!!!!! setup must be launched AFTER the display + listener threads
 // * allow diodRGB to only have two or even one color, without
 // having to give dummy pin numbers
+// use static to try to avoid polluting the namespace of client code
 
 // cases:
   // calling write/read/analog for wrong types
