@@ -68,7 +68,9 @@ int sig(){
 }
 
 void pietonInterrupt(int which){
-  waaa = currentTraffic * 100 + currentState ; 
+  setBothTraffic(which, GREEN);
+  return;
+
   if (currentTraffic != which) return;
   if (currentState != GREEN) return;
 
@@ -135,7 +137,7 @@ void loop(void){
     firstTime = 0;
     sig();
   }
-  day();
+  //day();
 }
 
 #ifdef __ASIM__
