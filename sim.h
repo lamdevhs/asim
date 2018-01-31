@@ -122,6 +122,15 @@ typedef struct reg
   int (*printer)(struct reg * reg); // special display
 } Register;
 
+typedef struct spied
+{
+  char name[SIZE_NAME];
+  int *pointer;
+  int (*printer)(int value);
+  // char symbols[BIGN][SIZE_NAME];
+  // int symbolLimit;
+} Spied;
+
 
 // functions
 void setSim(int type);
@@ -132,7 +141,9 @@ void button(int pinIx, char *name, char key);
 void diodRGB(int rIx, int gIx, int bIx, char *name);
 void traffic(int rIx, int yIx, int gIx, char *name);
 int mkRegister(int valIx, int pushIx, int sendIx, char *name, int size, int help);
-void digitalDisplay(int valIx, int pushIx, int sendIx, char *name);
+  void digitalDisplay(int valIx, int pushIx, int sendIx, char *name);
+int spy(int *pointer, char *name);
+  void spyWithPrinter(int *pointer, char *name, int (*printer)(int value));
 
 void setup(void);
 void loop(void);
@@ -162,6 +173,9 @@ void launchThreads(void);
       void printTraffic(Traffic *traffic);
       void printRegister(Register * reg);
         int printDigitalDisplay(Register * reg);
+      
+      void printSpied(Spied *spied);
+
       void printDiodRGB(DiodRGB *diodRGB);
         int getMainColor(int r, int g, int b);
         int getMix(int mainColor, int r, int g, int b);
@@ -228,4 +242,20 @@ Bool kbhit(void);
   * freeze button (stop everything)
   * print to display anything
   * print value of some variable in real time (with pointer)
+    * maybe permit to give an array of symbolic strings
+    * to replace the dry int version
+    * esp for booleans
+  * change display to reflect any order the use wants
+  * allows adding separations in the display
+  * make the display of all virtual objects generic:
+  typedef struct visible {
+    void *object;
+    void (*printer)(void *object);
+  } Visible;
+*/
+
+
+/* security:
+   * test for char *name pointers to be null
+
 */

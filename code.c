@@ -10,7 +10,6 @@
 // tmp
 extern Arduino sim;
 extern Diod diods[];
-extern int waaa;
 
 // to make it work:
 int red = 0, yellow = 1, btn = 2;
@@ -138,7 +137,9 @@ void pushSeq(int rg1, int rg2, int rg3, int *seq, int size){
   digitalWrite(rg3, LOW);
   delay(1000);
 }
-
+int xvar = 0;
+int yvar = 0;
+#define COLN 4
 void loop(void){
   /*int bst = digitalRead(btn);
   if (bst == HIGH) {
@@ -148,20 +149,20 @@ void loop(void){
   //onIfon(bt2, r);
   //onIfon(bt3, g);
   //onIfon(bt4, b);
-  waaa = delay(1000);
-  yval = 1 - yval;
-  digitalWrite(yellow, yval);
-  digitalWrite(tR, HIGH);
-  int i;
-  for (i = 0; i < 10; i++){
-    pushSeq(rg1, rg2, rg3, nums[i], 8);
-    delay(1000);
+  delay(1000);
+  xvar++;
+  yvar = (yvar + 1) % COLN;
+}
+
+int colorz(int val) {
+  switch (val) {
+    case 0: printf("red"); break;
+    case 1: printf("blue"); break;
+    case 2: printf("black"); break;
+    case 3: printf("green"); break;
+    default: return -1;
   }
-  while(1){
-    //blink(tR);
-    blink(tY);
-    blink(tG);
-  }
+
 }
 
 #ifdef __ASIM__
@@ -176,6 +177,8 @@ void init(void){
   diodRGB(r, g, b, "foo");
   traffic(tR, tY, tG, "horizon");
   digitalDisplay(rg1, rg2, rg3, "myreg");
+  spy(&xvar, "xvar");
+  spyWithPrinter(&yvar, "color", colorz);
 }
 
 void main(void){

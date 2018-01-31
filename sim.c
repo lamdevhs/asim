@@ -24,6 +24,8 @@ Traffic traffics[BIGN];
 int trafficCount = 0;
 Register registers[BIGN];
 int registerCount = 0;
+Spied spiedValues[BIGN];
+int spiedValuesCount = 0;
 
 
 void setSim(int id){
@@ -171,10 +173,37 @@ int mkRegister(int valIx, int pushIx, int sendIx, char *name, int size, int help
 
 void digitalDisplay(int valIx, int pushIx, int sendIx, char *name){
   int ix = mkRegister(valIx, pushIx, sendIx, name, 16, 0);
-  waaa += ix;
   if (ix < 0) return; // ERROR
   Register *reg = &registers[ix];
   reg->printer = printDigitalDisplay;
+}
+
+int spy(int *pointer, char *name){
+  if (spiedValuesCount >= BIGN) return -1; // FAIL
+  if (pointer == NULL) return -1; // ERROR
+  int ix = spiedValuesCount;
+  Spied *spied = &spiedValues[ix];
+  ++spiedValuesCount;
+  spied->pointer = pointer;
+  setDisplayName(spied->name, name);
+  spied->printer = NULL;
+  //spied->symbolLimit = 0;
+  return ix;
+}
+
+void spyWithPrinter(int *pointer, char *name, int (*printer)(int val)){
+  int ix = spy(pointer, name);
+  if (ix < 0 || ix >= spiedValuesCount) return; //FAIL/ERROR/BUG
+  if (printer == NULL) return; //ERROR
+  Spied *spied = &spiedValues[ix];
+  int i, nextStart = 0;
+  // for (i = 0; i < symbolLimit; i++) {
+  //   nextStart = copyToSpace(spied->symbols[i], symbols + nextStart);
+  //   if (nextStart == -1) break;
+  // }
+  //spied->symbols = symbols;
+  // spied->symbolLimit = symbolLimit;
+  spied->printer = printer;
 }
 
 
@@ -286,6 +315,30 @@ void setDisplayName(char *dest, char *src){
   dest[SIZE_NAME - 1] = '\0';
 }
 
+// int copyToSpace(char *dest, char *src){
+//   int len = firstSpace(src);
+//   if (len == 0) return -1; //end of src
+//   int i;
+//   for (i = 0; i < SIZE_NAME - 1; i++) {
+//     if (i >= len) {
+//       dest[i] = '\0';
+//     }
+//     else {
+//       dest[i] = src[i];
+//     }
+//   }
+//   dest[SIZE_NAME - 1] = '\0';
+//   return len + 1;
+// }
+
+// int firstSpace(char *src){
+//   int i, len = strlen(src);
+//   for (i = 0; i < len; i++){
+//     if (src[i] == ' ') return i;
+//   }
+//   return len;
+// }
+
 
 
 void launchThreads(void){
@@ -324,8 +377,6 @@ void printDisplay(int row, int col){
   if (sim.interrupted) printf("[[interruption]]\n");
   else printf("\n");
   curRow++;
-  
-  printf("waaa: %d\n", waaa); curRow++;
 
   // printing diods
   printf("diods:\n"); curRow++;
@@ -367,6 +418,14 @@ void printDisplay(int row, int col){
   for (i = 0; i < buttonCount && curRow < row - 1; i++){
     printTAB;
     printButton(&buttons[i]);
+    curRow++;
+  }
+
+  // printing spied values
+  printf("spied values:\n"); curRow++;
+  for (i = 0; i < spiedValuesCount && curRow < row - 1; i++){
+    printTAB;
+    printSpied(&spiedValues[i]);
     curRow++;
   }
 
@@ -512,6 +571,26 @@ int printDigitalDisplay(Register * reg){
   printNL;
 
   return 4; // number of lines printed
+}
+
+void printSpied(Spied *spied){
+  if (spied->printer == NULL)
+    printf("%s = %d", spied->name, *spied->pointer);
+  else {
+    printf("%s = ", spied->name);
+    if (spied->printer(*spied->pointer) == -1){
+      printf("%d", *spied->pointer);
+    }
+  }
+  printNL;
+  // }
+  // else {
+  //   //TODO check spied->pointer didn't get null
+  //   int val = *spied->pointer;
+  //   if (val >= 0 && val < spied->symbolLimit) {
+  //     printf("%s = %s", spied->name, spied->symbols[val]);
+  //   }
+  // }
 }
 
 
