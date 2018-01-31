@@ -4,7 +4,7 @@
 #define FILE_ASIM
 
 #define BIGN 50
-#define SIZE_NAME 10
+#define SIZE_NAME 30
 #define DISPLAY_FREQ 50*1000
 
 // constants
@@ -134,6 +134,7 @@ void traffic(int rIx, int yIx, int gIx, char *name);
 int mkRegister(int valIx, int pushIx, int sendIx, char *name, int size, int help);
 void digitalDisplay(int valIx, int pushIx, int sendIx, char *name);
 
+void setup(void);
 void loop(void);
 
 int delay(int ms);
@@ -208,6 +209,8 @@ Bool kbhit(void);
 // use static to try to avoid polluting the namespace of client code
 // what happens if analog is sent to an INPUT connected to an interrupt?
 
+
+
 // cases:
   // calling write/read/analog for wrong types
   // defining a button/diod/etc for wrong type
@@ -219,3 +222,10 @@ Bool kbhit(void);
   // of something connected to a button
   // (if it's INPUT, in theory, it changes the pullup option value)
 
+/* ideas:
+  * pause button (but can still use buttons to modify state,
+  and therefore execute interruptions)
+  * freeze button (stop everything)
+  * print to display anything
+  * print value of some variable in real time (with pointer)
+*/

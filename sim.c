@@ -26,9 +26,6 @@ Register registers[BIGN];
 int registerCount = 0;
 
 
-int waaa = 0;
-int ieh = 0;
-
 void setSim(int id){
   int i;
 
@@ -70,7 +67,7 @@ void setSim(int id){
 
   if (id == UNO) {
     sim.minDigital = 0;
-    sim.maxDigital = 30; // TOD temporary values
+    sim.maxDigital = BIGN - 1; // TODO temporary values
     
     defineInterrupt(2, 0);
     defineInterrupt(3, 1);
@@ -174,6 +171,7 @@ int mkRegister(int valIx, int pushIx, int sendIx, char *name, int size, int help
 
 void digitalDisplay(int valIx, int pushIx, int sendIx, char *name){
   int ix = mkRegister(valIx, pushIx, sendIx, name, 16, 0);
+  waaa += ix;
   if (ix < 0) return; // ERROR
   Register *reg = &registers[ix];
   reg->printer = printDigitalDisplay;
@@ -602,6 +600,7 @@ int getMix(int mainColor, int r, int g, int b){
 
 void *threadLoop(void *_) {
   sim.loopThread = pthread_self();
+  setup();
   while (1) {
     loop();
     //usleep(1000 + DISPLAY_FREQ);

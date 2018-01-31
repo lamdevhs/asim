@@ -10,155 +10,242 @@ extern int waaa;
 
 #endif
 
-#define RED 0
-#define ORANGE 1
-#define GREEN 2
-#define OFF 3
-
-#define HORIZON 0
-#define VERTICAL 1
-
 #ifndef min
 #define min(a, b) ((a < b) ? a : b)
 #endif
-int feux[][3] = {
-  {6,5,4}, {9,8,7}
+
+#define positivePred(a) (a = (a <= 0) ? 0 : a - 1)
+#define PIETON_ACCEL_VERT 1
+  // ^ de combien se reduit la duree du feu lorsqu'un pieton
+  // appuie sur le bouton pour traverser
+
+typedef enum etatFeu {
+  Rouge,
+  Orange,
+  Vert,
+  Off
+} EtatFeu ;
+
+typedef enum routeIx {
+  Largeur, // gauche-droite
+  Hauteur // haut-bas
+} RouteIx;
+
+
+
+#define NCOULEURS 3
+typedef struct route {
+  int feux[NCOULEURS]; // Rouge, Orange Vert
+  int btnPieton;
+  int captVoiture;
+  int affichage[3]; // 0 is value, 1 is push, 2 is send
+} Route;
+
+#define NROUTES 2
+Route routes[NROUTES] = {
+  {{6,5,4}, 20, 18, {34, 35, 36}},
+  {{9,8,7}, 21, 19, {37, 38, 39}}
 };
+int urgence = 2;
 
-int pietons[2] = {20,21};
+volatile RouteIx routeOuverte = Largeur;
+volatile EtatFeu etatRouteOuverte = Rouge; // feu des voitures
+volatile int tempsRestant = 1; // en secondes
+volatile int pietonVeutTraverser = 0;
 
-int voitures[2] = {18,19};
-
-volatile int currentTraffic = HORIZON;
-volatile int currentState = RED;
-volatile int currentTimer = 0;
+#define JOUR 1
+#define NUIT 0
+volatile int mode = JOUR;
 
 
-
-int setTraffic(int *feu, int state){
+void changerFeux(RouteIx route, EtatFeu etat){
+  int *feux = routes[route].feux;
   int i = 0;
-  for (i = 0; i < 3; i++){
-    digitalWrite(feu[i], LOW);
+  for (i = 0; i < NCOULEURS; i++){
+    digitalWrite(feux[i], LOW);
   }
-  if (state != OFF) digitalWrite(feu[state], HIGH);
+  if (etat != Off) digitalWrite(feux[etat], HIGH);
 }
 
-int setBothTraffic(int traffic, int state){
-  setTraffic(feux[1 - traffic], RED);
-  setTraffic(feux[traffic], state);
+void changerCirculation(){
+  changerFeux(1 - routeOuverte, Rouge);
+  changerFeux(routeOuverte, etatRouteOuverte);
 }
 
-void setDayTraffic(){
-  setBothTraffic(currentTraffic, currentState);
-}
 #define FREQ 200
 
-int sig(){
-  int i;
-  for (i = 0; i < 3; i++){
-    setTraffic(feux[HORIZON], RED);
+int prologue(){
+  int couleur;
+  for (couleur = 0; couleur < NCOULEURS; couleur++){
+    changerFeux(Largeur, couleur);
     delay(FREQ);
-    setTraffic(feux[HORIZON], OFF);
+    changerFeux(Largeur, Off);
     delay(FREQ);
-    setTraffic(feux[VERTICAL], RED);
+    changerFeux(Hauteur, couleur);
     delay(FREQ);
-    setTraffic(feux[VERTICAL], OFF);
+    changerFeux(Hauteur, Off);
     delay(FREQ);
   }
 }
 
-void pietonInterrupt(int which){
-  setBothTraffic(which, GREEN);
-  return;
-
-  if (currentTraffic != which) return;
-  if (currentState != GREEN) return;
-
-  currentTimer = min(currentTimer, 0);
+void pietonEvenement(){
+  RouteIx ici = (digitalRead(routes[1].btnPieton) == HIGH);
+    // ^ vaut 1 si le btnPieton de la route 1 est HIGH, 0 sinon
+  
+  if (routeOuverte != ici ||
+    etatRouteOuverte != Vert) return;
+  // sinon:
+  // la route du piéton est bien ouverte
+  // et le feu des voitures est vert
+  tempsRestant = min(tempsRestant, PIETON_ACCEL_VERT);
+  pietonVeutTraverser = 1;
 }
 
-void pietonInterrH(){
-  pietonInterrupt(HORIZON);
+
+void initJour(){
+  routeOuverte = Largeur;
+  etatRouteOuverte = Rouge; // feu des voitures
+  changerCirculation();
+  tempsRestant = 1;
+  pietonVeutTraverser = 0;
 }
 
-void pietonInterrV(){
-  pietonInterrupt(VERTICAL);
+
+void urgenceEvenement(){
+  mode = 1 - mode;
+  if (mode == JOUR) initJour();
 }
 
-void (*(interrPietons[2]))() = {
-  pietonInterrH,
-  pietonInterrV
-};
+void afficherDureeFeuRouge(){
+
+}
+
+
+void modeJour(){
+  changerCirculation();
+  if (tempsRestant != 0) {
+    // il reste du credit pour l'etat en cours
+    if (etatRouteOuverte == Vert)
+      afficherDureeFeuRouge();
+
+    delay(1000);
+    positivePred(tempsRestant);
+    return;
+  }
+  else if (etatRouteOuverte == Rouge) {
+    // change de route ouverte:
+    routeOuverte = 1 - routeOuverte;
+    etatRouteOuverte = Vert;
+    tempsRestant = 5;
+  }
+  else if (etatRouteOuverte == Vert) { // fin de vert
+    // check cars:
+    if (digitalRead(routes[1 - routeOuverte].captVoiture) == HIGH
+      // ^ une voiture attend sur l'autre voie
+      || pietonVeutTraverser) {
+      etatRouteOuverte = Orange;
+      tempsRestant = 1;
+      pietonVeutTraverser = 0;
+    }
+    else // sinon, on reste vert pour encore au moins 1 sec
+      tempsRestant = 1;
+  }
+  else if (etatRouteOuverte == Orange) { // fin de orange
+    etatRouteOuverte = Rouge;
+    tempsRestant = 1;
+  }
+}
+
+void modeNuit() {
+
+}
+
 
 
 void setup(void){
-
   int i, j;
-  for (j = 0; j < 2; j++) {
+  int departFeux = 4;
+  int departPieton = 20;
+  int departVoitures = 18;
+  int departAffichage = 34;
+  for (j = 0; j < NROUTES; j++) {
+    Route *route = &routes[j];
+    for (i = 0; i < NCOULEURS; i++) {
+      // 4,5,6 pour route j = 0, 7,8,9 pour route 1
+      //route->feux[i] = 4 + 3*j + i;
+      pinMode(route->feux[i], OUTPUT);
+    }
+    //route->btnPieton = departPieton + j;
+    //route->captVoiture = departVoitures + j;
+    pinMode(route->btnPieton, INPUT);
+    pinMode(route->captVoiture, INPUT);
+    attachInterrupt(
+      digitalPinToInterrupt(route->btnPieton),
+      pietonEvenement, RISING);
+
     for (i = 0; i < 3; i++) {
-      pinMode(feux[j][i], OUTPUT);
-      pinMode(feux[j][i], OUTPUT);
+      // 34,35,36 pour route j = 0,
+      // 37,38,39 pour route 1
+      //route->affichage[i] = 34 + 3*j + i;
+      pinMode(route->affichage[i], OUTPUT);
     }
-    pinMode(pietons[j], INPUT);
-    pinMode(voitures[j], INPUT);
-    attachInterrupt(digitalPinToInterrupt(pietons[j]), interrPietons[j], RISING);
   }
+
+  pinMode(urgence, INPUT);
+  attachInterrupt(
+    digitalPinToInterrupt(urgence),
+    urgenceEvenement, RISING);
+  prologue();
 }
 
-void day(){
-  if (currentTimer != 0) {
-    --currentTimer;
-    delay(1000);
-    return;
-  }
-  else if (currentState == RED) {
-    currentState = GREEN;
-    currentTraffic = 1 - currentTraffic;
-    currentTimer = 5;
-  }
-  else if (currentState == GREEN) {
-    // check cars:
-    if (digitalRead(voitures[1 - currentTraffic]) == HIGH) {
-      currentState = ORANGE;
-      currentTimer = 1;
-    }
-    else currentTimer = 1;
-  }
-  else if (currentState == ORANGE) {
-    currentState = RED;
-    currentTimer = 1;
-  }
-  setDayTraffic();
-}
 
-int firstTime = 1;
 void loop(void){
-  if (firstTime){
-    firstTime = 0;
-    sig();
-  }
-  //day();
+  if (mode == JOUR) modeJour();
+  else modeNuit();
 }
 
 #ifdef __ASIM__
+#define EMPTY 0
+
 void init(void){
   setSim(UNO);
-  traffic(6, 5, 4, "feuH");
-  traffic(9, 8, 7, "feuV");
-  traffic(9, 0, 7, "pietonH");
-  traffic(6, 0, 4, "pietonV");
-  button(pietons[0], "pietonH", 'h');
-  button(pietons[1], "pietonV", 'v');
-  button(voitures[0], "voitureH", 'a');
-  button(voitures[1], "voitureV", 'z');
+  Route largeur = routes[Largeur];
+  Route hauteur = routes[Hauteur];
+  traffic(
+    largeur.feux[Rouge],
+    largeur.feux[Orange],
+    largeur.feux[Vert],
+    "feux largeur");
+  traffic(
+    hauteur.feux[Rouge],
+    hauteur.feux[Orange],
+    hauteur.feux[Vert],
+    "feux hauteur");
+  traffic(
+    largeur.feux[Rouge],
+    EMPTY,
+    largeur.feux[Vert],
+    "feux pieton hauteur");
+  traffic(
+    hauteur.feux[Rouge],
+    EMPTY,
+    hauteur.feux[Vert],
+    "feux pieton largeur");
+  button(largeur.btnPieton, "pieton largeur", 'l');
+  button(hauteur.btnPieton, "pieton hauteur", 'h');
+  button(largeur.captVoiture, "capteur voitures largeur", 'v');
+  button(hauteur.captVoiture, "capteur voitures hauteur", 'w');
+  button(urgence, "urgence", 'u');
+  digitalDisplay(largeur.affichage[0], largeur.affichage[1], largeur.affichage[2],
+    "affichage attente largeur");
+  digitalDisplay(hauteur.affichage[0], hauteur.affichage[1], hauteur.affichage[2],
+    "affichage attente hauteur");
 }
 
 void main(void){
   nonblock(NB_ENABLE);
   init();
-  setup();
   signal(SIGUSR1, iEventHandler);
-  //return;
   launchThreads();
 }
 
