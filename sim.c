@@ -70,10 +70,14 @@ void setSim(int id){
 
   if (id == UNO) {
     sim.minDigital = 0;
-    sim.maxDigital = 20; // TOD temporary values
+    sim.maxDigital = 30; // TOD temporary values
     
     defineInterrupt(2, 0);
     defineInterrupt(3, 1);
+    defineInterrupt(18, 2);
+    defineInterrupt(19, 3);
+    defineInterrupt(20, 4);
+    defineInterrupt(21, 5);
   }
 }
 
