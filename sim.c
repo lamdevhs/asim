@@ -170,7 +170,7 @@ int mkRegister(int valIx, int pushIx, int sendIx, char *name, int size, int help
 
 void digitalDisplay(int valIx, int pushIx, int sendIx, char *name){
   int ix = mkRegister(valIx, pushIx, sendIx, name, 16, 0);
-  if (ix <= 0) return; // ERROR
+  if (ix < 0) return; // ERROR
   Register *reg = &registers[ix];
   reg->printer = printDigitalDisplay;
 }
@@ -468,7 +468,7 @@ int printDigitalDisplay(Register * reg){
   printf(" ");
   if (reg->output[0]) printf("_");
   else printf(" ");
-  printf("   ");
+  printf("    ");
   if (reg->output[0 + 8]) printf("_");
   else printf(" ");
   printNL;

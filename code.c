@@ -85,6 +85,16 @@ int yval = LOW;
 int regVal = 0;
 int regCount = 0;
 
+void walk(){
+  digitalWrite(rg1, 1);
+  digitalWrite(rg2, LOW);
+  digitalWrite(rg2, HIGH);
+  digitalWrite(rg2, LOW);
+  digitalWrite(rg3, LOW);
+  digitalWrite(rg3, HIGH);
+  digitalWrite(rg3, LOW);
+}
+
 void pushReg(){
   //printf("\n");
   digitalWrite(rg1, (++regVal % 2) && (regVal % 3));
@@ -101,6 +111,34 @@ void pushReg(){
   }
 }
 
+int nums[][8] = {
+  {1,1,1,1,1,1,0,0}, // 0
+  {0,1,1,0,0,0,0,0}, // 1
+  {1,1,0,1,1,0,1,0}, // 2
+  {1,1,1,1,0,0,1,0}, // 3
+  {0,1,1,0,0,1,1,0}, // 4
+  {1,0,1,1,0,1,1,0}, // 5
+  {1,0,1,1,1,1,1,0}, // 6
+  {1,1,1,0,0,0,0,0}, // 7
+  {1,1,1,1,1,1,1,0}, // 8
+  {1,1,1,1,0,1,1,0}, // 9
+};
+
+void pushSeq(int rg1, int rg2, int rg3, int *seq, int size){
+  digitalWrite(rg2, LOW);
+  //printf("\n");
+  int i;
+  for (i = size - 1; i >= 0; i--){
+    digitalWrite(rg1, seq[i]);
+    digitalWrite(rg2, HIGH);
+    digitalWrite(rg2, LOW);
+  }
+  digitalWrite(rg3, LOW);
+  digitalWrite(rg3, HIGH);
+  digitalWrite(rg3, LOW);
+  delay(1000);
+}
+
 void loop(void){
   /*int bst = digitalRead(btn);
   if (bst == HIGH) {
@@ -114,11 +152,15 @@ void loop(void){
   yval = 1 - yval;
   digitalWrite(yellow, yval);
   digitalWrite(tR, HIGH);
+  int i;
+  for (i = 0; i < 10; i++){
+    pushSeq(rg1, rg2, rg3, nums[i], 8);
+    delay(1000);
+  }
   while(1){
     //blink(tR);
     blink(tY);
     blink(tG);
-    pushReg();
   }
 }
 
