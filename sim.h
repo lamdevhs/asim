@@ -152,14 +152,16 @@ void setDisplayName(char *dest, char *src);
 void launchThreads(void);
   void *threadDisplay(void *_);
     void printDisplay(int row, int col);
+      void state2Str(DigitalPin *pin, char* str);
+      
       void printDiod(Diod *diod);
       void printButton(Button *button);
       void printTraffic(Traffic *traffic);
-      void printDiodRGB(DiodRGB *diodRGB);
       void printRegister(Register * reg);
-      int getMainColor(int r, int g, int b);
-      int getMix(int mainColor, int r, int g, int b);
-      void state2Str(DigitalPin *pin, char* str);
+      void printDiodRGB(DiodRGB *diodRGB);
+        int getMainColor(int r, int g, int b);
+        int getMix(int mainColor, int r, int g, int b);
+        
   
   void *threadLoop(void *_);
   /*
@@ -200,6 +202,7 @@ Bool kbhit(void);
 // * allow diodRGB to only have two or even one color, without
 // having to give dummy pin numbers
 // use static to try to avoid polluting the namespace of client code
+// what happens if analog is sent to an INPUT connected to an interrupt?
 
 // cases:
   // calling write/read/analog for wrong types

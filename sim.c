@@ -361,6 +361,24 @@ void printDisplay(int row, int col){
   }
 }
 
+
+void state2Str(DigitalPin *pin, char *str){
+  if (pin->value == LOW) {
+    sprintf(str, "   ");
+  }
+  else if (pin->isAnalog) {
+    sprintf(str, "%3d", pin->value);
+  }
+  else if (pin->value == HIGH){
+    sprintf(str, "###");
+  }
+  else {
+    sprintf(str, "???");
+    // bug!
+  }
+}
+
+//DEBUG
 int printInterr(){
   int ls = 0;
   printf("output\n"); ++ls;
@@ -388,6 +406,8 @@ int printEv(IEvent *ie){
   if (ie->next == NULL) return 0;
   else return 1;
 }
+
+// ---
 
 void printDiod(Diod *diod){
   char state[4];
@@ -504,21 +524,6 @@ int getMix(int mainColor, int r, int g, int b){
     // ^ if mainColor in cyan/yellow/magenta
 }
 
-void state2Str(DigitalPin *pin, char *str){
-  if (pin->value == LOW) {
-    sprintf(str, "   ");
-  }
-  else if (pin->isAnalog) {
-    sprintf(str, "%3d", pin->value);
-  }
-  else if (pin->value == HIGH){
-    sprintf(str, "###");
-  }
-  else {
-    sprintf(str, "???");
-    // bug!
-  }
-}
 
 
 
