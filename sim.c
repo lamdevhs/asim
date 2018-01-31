@@ -74,6 +74,10 @@ void setSim(int id){
     
     defineInterrupt(2, 0);
     defineInterrupt(3, 1);
+    defineInterrupt(18, 2);
+    defineInterrupt(19, 3);
+    defineInterrupt(20, 4);
+    defineInterrupt(21, 5);
   }
 }
 
