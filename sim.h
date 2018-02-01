@@ -1,10 +1,14 @@
-#include <pthread.h>
-
 #ifndef FILE_ASIM
 #define FILE_ASIM
 
+#include <pthread.h>
+#include <stdio.h>
+  // for using printf in SYMCASE macro
+
+#define dbgprintf printf
+
 #define BIGN 50
-#define SIZE_NAME 30
+#define SIZE_NAME 100
 #define DISPLAY_FREQ 50*1000
 
 // constants
@@ -134,6 +138,11 @@ typedef struct spied
 
 
 // functions
+void main(void);
+void setup(void);
+void loop(void);
+void init(void);
+
 void setSim(int type);
 void defineInterrupt(int pinIx, int interrId);
 
@@ -146,8 +155,7 @@ int mkRegister(int valIx, int pushIx, int sendIx, char *name, int size, int help
 int spy(int *pointer, char *name);
   void spyWithPrinter(int *pointer, char *name, int (*printer)(int value));
 
-void setup(void);
-void loop(void);
+
 
 int delay(int ms);
 
@@ -242,6 +250,7 @@ Bool kbhit(void);
   and therefore execute interruptions)
   * freeze button (stop everything)
   * print to display anything
+  * print static titles in between virtual objects
   * print value of some variable in real time (with pointer)
     * maybe permit to give an array of symbolic strings
     * to replace the dry int version

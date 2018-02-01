@@ -117,7 +117,7 @@ void urgenceEvenement(){
 }
 
 void afficherDureeFeuRouge(){
-
+  
 }
 
 

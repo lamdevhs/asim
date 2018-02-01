@@ -1,11 +1,8 @@
-#define __ASIM__
-
 #include <stdio.h>
 #ifdef __ASIM__
   #include "sim.h"
   #include <signal.h> // signal, SIGUSR1
 #endif
-#include "code.h"
 
 // tmp
 extern Arduino sim;
@@ -135,7 +132,6 @@ void pushSeq(int rg1, int rg2, int rg3, int *seq, int size){
   digitalWrite(rg3, LOW);
   digitalWrite(rg3, HIGH);
   digitalWrite(rg3, LOW);
-  delay(1000);
 }
 int xvar = 0;
 int yvar = 0;
@@ -152,6 +148,8 @@ void loop(void){
   delay(1000);
   xvar++;
   yvar = (yvar + 1) % COLN;
+  pushSeq(rg1, rg2, rg3, nums[xvar % 10], 8);
+  pushSeq(rg1, rg2, rg3, nums[(xvar % 100) / 10], 8);
 }
 
 
@@ -191,15 +189,6 @@ void init(void){
   digitalDisplay(rg1, rg2, rg3, "myreg");
   spy(&xvar, "xvar");
   spyWithPrinter(&yvar, "color", colorz);
-}
-
-void main(void){
-  nonblock(NB_ENABLE);
-  init();
-  setup();
-  signal(SIGUSR1, iEventHandler);
-  //return;
-  launchThreads();
 }
 
 #endif

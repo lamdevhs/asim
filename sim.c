@@ -27,6 +27,13 @@ int registerCount = 0;
 Spied spiedValues[BIGN];
 int spiedValuesCount = 0;
 
+void main(void){
+  nonblock(NB_ENABLE);
+  init();
+  signal(SIGUSR1, iEventHandler);
+  //return;
+  launchThreads();
+}
 
 void setSim(int id){
   int i;
@@ -367,12 +374,8 @@ void printDisplay(int row, int col){
   int curRow = 0;
   int curCol = 0;
   int i;
-
-  printNL; curRow++;
   
-  //debug
-  int ls = printInterr();
-  curRow += ls;
+  printNL; curRow++;
 
   if (sim.interrupted) printf("[[interruption]]\n");
   else printf("\n");
@@ -429,7 +432,12 @@ void printDisplay(int row, int col){
     curRow++;
   }
 
-  
+    //debug
+  printf("\n[[DEBUG]]\n"); curRow+=2;
+  int ls = printInterr();
+  curRow += ls;
+
+
   
   // fill screen
   for (; curRow < row - 1; curRow++){
@@ -616,22 +624,26 @@ void printDiodRGB(DiodRGB *diodRGB){
   state2Str(diodRGB->green, greenState);
   state2Str(diodRGB->blue, blueState);
   
-  int mainColor = getMainColor(
-      diodRGB->red->value,
-      diodRGB->green->value,
-      diodRGB->blue->value);
-  char *mainColorName = colorNames[mainColor];
-  int  mixColor =
-    getMix(
-      mainColor,
-      diodRGB->red->value,
-      diodRGB->green->value,
-      diodRGB->blue->value);
-  char *mixColorName = colorNames[mixColor];
-  printf("%s [R:%s G:%s B:%s] = *%7s -> %7s*",
+  // int mainColor = getMainColor(
+  //     diodRGB->red->value,
+  //     diodRGB->green->value,
+  //     diodRGB->blue->value);
+  // char *mainColorName = colorNames[mainColor];
+  // int  mixColor =
+  //   getMix(
+  //     mainColor,
+  //     diodRGB->red->value,
+  //     diodRGB->green->value,
+  //     diodRGB->blue->value);
+  // char *mixColorName = colorNames[mixColor];
+  printf("%s [%s %s %s] *%3s %5s %4s*",
     diodRGB->name,
     redState, greenState, blueState,
-    mainColorName, mixColorName);
+    (diodRGB->red->value != 0) ? "RED" : "",
+    (diodRGB->green->value != 0) ? "GREEN" : "",
+    (diodRGB->blue->value != 0) ? "BLUE" : ""
+  );
+    // mainColorName, mixColorName);
   printNL;
 }
 
@@ -829,7 +841,6 @@ void *threadListener(void *_){
   while (1) {
     //while(!kbhit());
     c = fgetc(stdin);
-    printf("<%c>", c);
     
     for (i = 0; i < buttonCount; i++){
       button = &buttons[i];
