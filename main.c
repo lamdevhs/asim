@@ -1,5 +1,7 @@
 #include <unistd.h> // STDIN_FILENO
 #include <signal.h> // signal, SIGUSR1
+#include <pthread.h>
+#include <stdio.h>
 #include "asim.h"
 
 

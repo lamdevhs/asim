@@ -176,7 +176,7 @@ int colorz(int val) {
 
 #ifdef __ASIM__
 void init(void){
-  setSim(UNO);
+  arduino(UNO);
   diod(red, "red");
   diod(yellow, "yellow");
   button(btn, "one", 'c');

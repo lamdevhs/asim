@@ -1,4 +1,5 @@
 #include <stdlib.h>
+#include <stdio.h>
 #include "asim.h"
 
 // globals
@@ -21,10 +22,10 @@ Queue displayed;
 
 
 
-void setSim(int id){
+void arduino(ArduinoType type){
   int i;
 
-  sim.id = id;
+  sim.type = type;
 
     // dummy event, solely there to prevent
     // the queue to ever be empty
@@ -76,7 +77,7 @@ void setSim(int id){
     sim.interrupts[i] = NULL;
   }
 
-  if (id == UNO) {
+  if (type == UNO) {
     sim.minDigital = 0;
     sim.maxDigital = BIGN - 1; // TODO temporary values
     
@@ -167,7 +168,7 @@ void traffic(int rIx, int yIx, int gIx, char *name){
   traffic->green = &sim.pins[gIx];
 }
 
-int mkRegister(int valIx, int pushIx, int sendIx, char *name, int size, int help){
+int shiftRegister(int valIx, int pushIx, int sendIx, char *name, int size, Bool allVisible){
   if (registerCount >= BIGN ||
     !checkDigital(valIx) ||
     !checkDigital(pushIx) ||
@@ -185,7 +186,7 @@ int mkRegister(int valIx, int pushIx, int sendIx, char *name, int size, int help
   reg->input = (int *)malloc(size*sizeof(int));
   reg->output = (int *)malloc(size*sizeof(int));
     // ^ TODO make sure they're zero-initialized
-  reg->help = help;
+  reg->allVisible = allVisible;
   reg->printer = NULL;
 
   reg->push->onChange = registerPush;
@@ -196,7 +197,7 @@ int mkRegister(int valIx, int pushIx, int sendIx, char *name, int size, int help
 }
 
 void digitalDisplay(int valIx, int pushIx, int sendIx, char *name){
-  int ix = mkRegister(valIx, pushIx, sendIx, name, 16, 0);
+  int ix = shiftRegister(valIx, pushIx, sendIx, name, 16, 0);
   if (ix < 0) return; // ERROR
   Register *reg = &registers[ix];
   reg->printer = printDigitalDisplay;
@@ -284,7 +285,7 @@ void printTraffic(Traffic *traffic){
 
 void printRegister(Register * reg){
   printf("%s: ", reg->name);
-  if (reg->help) {
+  if (reg->allVisible) {
     printList(reg->input, reg->size);
     printf(" -> ");
   }

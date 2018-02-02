@@ -1,7 +1,7 @@
 #ifndef FILE_ASIM
 #define FILE_ASIM
 
-#include <pthread.h>
+#include <pthread.h> // pthread_t
 #include <stdio.h>
   // for using printf in SYMCASE macro
 
@@ -12,36 +12,18 @@
 #define SIZE_LINE 200
 #define DISPLAY_FREQ 50*1000
 
-// constants
-
-
-#define UNO 0
-
-
-// types
-
 typedef int Bool;
 
-
-typedef struct link
-{
-  void *content;
-  struct link *next;
-} Link;
-
-typedef struct queue
-{
-  Link *in; // where elements are added
-  Link *out; // where elements are treated
-  int size;
-} Queue;
-
-
+typedef enum {
+  UNO,
+  MEGA
+} ArduinoType;
 
 typedef enum {
   OUTPUT,
   INPUT,
-  INPUT_PULLUP, // will amount to setting HIGH as initial state
+  INPUT_PULLUP,
+    // ^ will amount to setting HIGH as off state
   INTERRUPT,
   MODE_NONE
 } PinMode;
@@ -57,41 +39,66 @@ typedef enum {
 
 #define LOW 0
 #define HIGH 1
+  // ^ for clarity's sake.
+  // obviously redundant since C
+  // has no type safety
+
+// -------- Queue
+typedef struct link
+{
+  void *content;
+  struct link *next;
+} Link;
+
+typedef struct queue
+{
+  Link *in; // where elements are added
+  Link *out; // from where elements are treated/deleted
+  int size;
+} Queue;
+  // FIFO link-based queue
+
 
 typedef struct digitalPin {
   PinMode mode;
   int value; // HIGH or LOW or 0-255
   Bool isAnalog; // is the current value analog?
-  Bool canAnalog;
-  Bool canInterrupt;
-  int interrIx;
+  Bool canAnalog; // can be used as analog output?
+  Bool canInterrupt; // can be used as interrupt?
+  int interrIx; // interrupt index in Arduino.interrupts
   InterruptMode interrMode;
-  void (*interrFun)(void);
+  void (*interrFun)(void); // function to call upon interruption
 
   void (*onChange)(void *arg, struct digitalPin *pin, int oldVal);
-  void *onChangeArg;
+    // ^ optional function to be called whenever the value changes
+    // useful for the (virtual) shift registers
+  void *onChangeArg; // argument for onChange
 } DigitalPin;
 
-
-typedef struct ievent
+typedef struct interruptEvent
 {
-  DigitalPin *pin;
-  //struct ievent *next;
-  Bool dead; // signals the event has been taken care of
+  DigitalPin *pin; // pin that triggered the event
+  Bool dead; // signals that the event has been taken care of
 } IEvent;
+  // interrupt event; mallocated
 
 
-
+// --------- virtual objects, cf vobjects.c
 typedef struct arduino {
-  int id;
-  int val;
+  ArduinoType type;
   DigitalPin pins[BIGN];
-  int minDigital;
-  int maxDigital;
+  int minDigital; // smallest valid digital pin number
+  int maxDigital; // biggest [...]
   DigitalPin *interrupts[BIGN];
+    // ^ pointers for pins which are valid interrupts
+    // the index of the items is meant to match
+    // the interrupt number to give to attachInterrupt()
   Queue ieq;
+    // ^ interrupt events queue
   pthread_t loopThread;
+    // ^ used to send it a pthread signal
   Bool interrupted;
+    // ^ is loopThread currently treating an interruption?
 } Arduino;
 
 typedef struct diod
@@ -106,6 +113,8 @@ typedef struct button
   Bool isPressed;
   DigitalPin *pin;
   char key;
+    // ^ keyboard key to press
+    // to change the button state
 } Button;
 
 typedef struct diodRGB
@@ -123,20 +132,34 @@ typedef struct traffic
   DigitalPin *yellow;
   DigitalPin *green;
 } Traffic;
+  // ^ virtual traffic light
 
 typedef struct reg
 {
   char name[SIZE_NAME];
-  DigitalPin *value;
+  DigitalPin *value; // value to be pushed
   DigitalPin *push;
+    // pushes the value from the 'left'
+    // in the hidden memory
   DigitalPin *send;
-  int size;
-  int *output;
-  int *input;
+    // ^ sends the hidden memory
+    // to the visible memory
 
-  Bool help; // set to 1 if you want to display input too
-  int (*printer)(struct reg * reg); // special display
+  // ^^ implemented via DigitalPin.onChange
+
+  int size; // in bits
+
+  int *output; // visible/displayed memory
+  int *input; // hidden memory
+    // ^ malloc'ed arrays
+
+  Bool allVisible;
+    // set to 1 so the hidden memory
+    // also be visible
+  
+  int (*printer)(struct reg * reg); // special displayer
 } Register;
+  // ^ shift register
 
 typedef struct spied
 {
@@ -166,14 +189,14 @@ void setup(void);
 void loop(void);
 void init(void);
 
-void setSim(int type);
+void arduino(ArduinoType type);
 void defineInterrupt(int pinIx, int interrId);
 
 void diod(int pinIx, char *name);
 void button(int pinIx, char *name, char key);
 void diodRGB(int rIx, int gIx, int bIx, char *name);
 void traffic(int rIx, int yIx, int gIx, char *name);
-int mkRegister(int valIx, int pushIx, int sendIx, char *name, int size, int help);
+int shiftRegister(int valIx, int pushIx, int sendIx, char *name, int size, Bool allVisible);
   void digitalDisplay(int valIx, int pushIx, int sendIx, char *name);
 int spy(int *pointer, char *name);
   void spyWithPrinter(int *pointer, char *name, int (*printer)(int value));
