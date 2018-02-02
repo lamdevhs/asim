@@ -9,6 +9,7 @@
 
 #define BIGN 50
 #define SIZE_NAME 100
+#define SIZE_LINE 200
 #define DISPLAY_FREQ 50*1000
 
 // constants
@@ -20,6 +21,22 @@
 // types
 
 typedef int Bool;
+
+
+typedef struct link
+{
+  void *content;
+  struct link *next;
+} Link;
+
+typedef struct queue
+{
+  Link *in; // where elements are added
+  Link *out; // where elements are treated
+  int size;
+} Queue;
+
+
 
 typedef enum {
   OUTPUT,
@@ -59,16 +76,11 @@ typedef struct digitalPin {
 typedef struct ievent
 {
   DigitalPin *pin;
-  struct ievent *next;
+  //struct ievent *next;
   Bool dead; // signals the event has been taken care of
 } IEvent;
 
-typedef struct eventQueue
-{
-  IEvent *in; // where events are added
-  IEvent *out; // where events are treated and freed
-  int size;
-} IEventQueue;
+
 
 typedef struct arduino {
   int id;
@@ -77,7 +89,7 @@ typedef struct arduino {
   int minDigital;
   int maxDigital;
   DigitalPin *interrupts[BIGN];
-  IEventQueue ieq;
+  Queue ieq;
   pthread_t loopThread;
   Bool interrupted;
 } Arduino;
@@ -136,6 +148,17 @@ typedef struct spied
 #define SYMCASE(sym) case sym: printf(#sym); break
  // ^ to be used with enumerations, a switch, and Spied.printer
 
+typedef struct printable {
+  void *object;
+  int (*printer)(void *object);
+} Printable;
+
+typedef struct staticMessage {
+  char message[SIZE_LINE];
+} StaticMessage;
+
+
+void pushInQueue(Link *link, Queue *queue);
 
 // functions
 void main(void);
@@ -155,7 +178,7 @@ int mkRegister(int valIx, int pushIx, int sendIx, char *name, int size, int help
 int spy(int *pointer, char *name);
   void spyWithPrinter(int *pointer, char *name, int (*printer)(int value));
 
-
+void addToDisplayList(void *object, int (*printer)(void *o));
 
 int delay(int ms);
 
@@ -177,13 +200,15 @@ void launchThreads(void);
     void printDisplay(int row, int col);
       void state2Str(DigitalPin *pin, char* str);
       
-      void printDiod(Diod *diod);
+      int printDiod(void *diod);
       void printButton(Button *button);
       void printTraffic(Traffic *traffic);
       void printRegister(Register * reg);
         int printDigitalDisplay(Register * reg);
       
       void printSpied(Spied *spied);
+
+      int printStaticMessage(void *o);
 
       void printDiodRGB(DiodRGB *diodRGB);
         int getMainColor(int r, int g, int b);
@@ -226,7 +251,8 @@ Bool kbhit(void);
 
 
 // TODO:
-// * !!!!!! setup must be launched AFTER the display + listener threads
+// make so pinMode checks the expected value of the mode based on what kind
+// of object the pin is bound to via init();
 // * allow diodRGB to only have two or even one color, without
 // having to give dummy pin numbers
 // use static to try to avoid polluting the namespace of client code
@@ -262,6 +288,10 @@ Bool kbhit(void);
     void *object;
     void (*printer)(void *object);
   } Visible;
+
+  * use malloc instead of static sizes of displayed text
+  * the functions used to create virtual objects must NOT work
+    outside of the init function!
 */
 
 

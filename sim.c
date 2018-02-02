@@ -14,6 +14,7 @@
 
 // globals
 Arduino sim;
+  // ^ the simulated arduino
 Diod diods[BIGN];
 int diodCount = 0;
 Button buttons[BIGN];
@@ -26,12 +27,16 @@ Register registers[BIGN];
 int registerCount = 0;
 Spied spiedValues[BIGN];
 int spiedValuesCount = 0;
+Queue displayed;
 
 void main(void){
   nonblock(NB_ENABLE);
   init();
+    // ^ user-coded function
+    // initializes `sim`,
+    // creates the virtual objects
+
   signal(SIGUSR1, iEventHandler);
-  //return;
   launchThreads();
 }
 
@@ -43,17 +48,33 @@ void setSim(int id){
     // dummy event, solely there to prevent
     // the queue to ever be empty
   IEvent *ie = (IEvent *)malloc(sizeof(IEvent));
+  Link *ieLink = (Link *)malloc(sizeof(Link));
     // TODO check null ptr
 
   ie->pin = NULL;
-  ie->next = NULL;
   ie->dead = 1;
 
-  sim.ieq.in = ie;
-  sim.ieq.out = ie;
+  ieLink->content = (void *)ie;
+
+  sim.ieq.in = ieLink;
+  sim.ieq.out = ieLink;
   sim.ieq.size = 0;
 
   sim.interrupted = 0;
+
+  // first thing in the display list
+  StaticMessage *welcome =
+    (StaticMessage *)malloc(sizeof(StaticMessage));
+  Link *welcomeLink = (Link *)malloc(sizeof(Link));
+  Printable *welcomePrintable = (Printable *)malloc(sizeof(Printable));
+
+  setDisplayName(welcome->message, "Simulator for code Arduino.");
+  welcomePrintable->object = (void *)welcome;
+  welcomePrintable->printer = printStaticMessage;
+  welcomeLink->content = (void *)welcomePrintable;
+
+  displayed.in = welcomeLink;
+  displayed.out = welcomeLink;
 
   DigitalPin *pin;
   for(i = 0; i < BIGN; i++){
@@ -105,6 +126,19 @@ void diod(int pinIx, char *name){
   ++diodCount;
   setDisplayName(diod->name, name);
   diod->pin = &sim.pins[pinIx];
+
+  addToDisplayList((void *)diod, printDiod);
+
+}
+
+void addToDisplayList(void *object, int (*printer)(void *o)){
+  Printable *printable = (Printable *)malloc(sizeof(Printable));
+  printable->object = object;
+  printable->printer = printer;
+  Link *link = (Link *)malloc(sizeof(Link));
+  link->content = (void *)printable;
+  link->next = NULL;
+  pushInQueue(link, &displayed);
 }
 
 void button(int pinIx, char *name, char key) {
@@ -366,9 +400,9 @@ void *threadDisplay(void *_) {
   }
 }
 
-
-int printInterr();
-int printEv(IEvent *ie);
+// *************************
+// int printInterr();
+// int printEv(IEvent *ie);
 
 void printDisplay(int row, int col){
   int curRow = 0;
@@ -376,18 +410,26 @@ void printDisplay(int row, int col){
   int i;
   
   printNL; curRow++;
+  
+  Link *link = displayed.out;
+  Printable *printable;
+  while(link != NULL) {
+    printable = (Printable *)link->content;
+    curRow += printable->printer(printable->object);
+    link = link->next;
+  }
 
   if (sim.interrupted) printf("[[interruption]]\n");
   else printf("\n");
   curRow++;
 
-  // printing diods
-  printf("diods:\n"); curRow++;
-  for (i = 0; i < diodCount && curRow < row - 1; i++){
-    printTAB;
-    printDiod(&diods[i]);
-    curRow++;
-  }
+  // // printing diods
+  // printf("diods:\n"); curRow++;
+  // for (i = 0; i < diodCount && curRow < row - 1; i++){
+  //   printTAB;
+  //   printDiod(&diods[i]);
+  //   curRow++;
+  // }
 
   // printing rgb diods
   printf("RGB diods:\n"); curRow++;
@@ -432,10 +474,10 @@ void printDisplay(int row, int col){
     curRow++;
   }
 
-    //debug
-  printf("\n[[DEBUG]]\n"); curRow+=2;
-  int ls = printInterr();
-  curRow += ls;
+  //   //debug ********
+  // printf("\n[[DEBUG]]\n"); curRow+=2;
+  // int ls = printInterr();
+  // curRow += ls;
 
 
   
@@ -462,42 +504,45 @@ void state2Str(DigitalPin *pin, char *str){
   }
 }
 
-//DEBUG
-int printInterr(){
-  int ls = 0;
-  printf("output\n"); ++ls;
-  IEvent *ie = sim.ieq.out;
-  if (ie == NULL){
-    printf("!!! NULL\n");
-    return ++ls;
-  }
-  while(printEv(ie)){
-    ++ls;
-    ie = ie->next;
-    if (ie == NULL){
-      printf("NULL\n");
-      return ++ls;
-    }
-  }
-  return ++ls;
-}
+  // //DEBUG
+  // int printInterr(){
+  //   int ls = 0;
+  //   printf("output\n"); ++ls;
+  //   IEvent *ie = (IEvent *)sim.ieq.out->content;
+  //   if (ie == NULL){
+  //     printf("!!! NULL\n");
+  //     return ++ls;
+  //   }
+  //   while(printEv(ie)){
+  //     ++ls;
+  //     ie = ie->next;
+  //     if (ie == NULL){
+  //       printf("NULL\n");
+  //       return ++ls;
+  //     }
+  //   }
+  //   return ++ls;
+  // }
 
-int printEv(IEvent *ie){
-  printf("in: %d, out: %d, dead: %d, next is null: %d\n",
-    ie == sim.ieq.in, ie == sim.ieq.out,
-    ie->dead, ie->next == NULL);
+  // int printEv(Link *ieLink){
+  //   IEvent *ie = (IEvent *)ieLink->content;
+  //   printf("in: %d, out: %d, dead: %d, next is null: %d\n",
+  //     ieLink == sim.ieq.in, ieLink == sim.ieq.out,
+  //     ie->dead, ieLink->next == NULL);
 
-  if (ie->next == NULL) return 0;
-  else return 1;
-}
+  //   if (ie->next == NULL) return 0;
+  //   else return 1;
+  // }
 
-// ---
+  // // ---
 
-void printDiod(Diod *diod){
+int printDiod(void *o){
+  Diod *diod = (Diod *)o;
   char state[4];
   state2Str(diod->pin, state);
-  printf("%s [%s]", diod->name, state);
+  printf("[diod] %s [%s]", diod->name, state);
   printNL;
+  return 1;
 }
 
 void printButton(Button *button){
@@ -599,6 +644,12 @@ void printSpied(Spied *spied){
   //     printf("%s = %s", spied->name, spied->symbols[val]);
   //   }
   // }
+}
+
+int printStaticMessage(void *o){
+  StaticMessage *msg = (StaticMessage *)o;
+  printf("%s\n", msg->message);
+  return 1; // TODO depends on presence of \n's in the message
 }
 
 
@@ -765,6 +816,13 @@ void digitalChange(DigitalPin *pin, int newValue, int fromListener){
   }
 }
 
+void pushInQueue(Link *link, Queue *queue){
+  if (queue->in == NULL) queue->out = link;
+  else queue->in->next = link;
+  queue->in = link;
+  ++queue->size;
+}
+
 void addInterrupt(DigitalPin *pin){
   if (!pin->canInterrupt) return; // BUG!
 
@@ -772,26 +830,22 @@ void addInterrupt(DigitalPin *pin){
     // ^ this variable name already being cursed
     // i won't bother checking for null pointer
     // TODO
+  Link *ieLink = (Link *)malloc(sizeof(Link));
 
   ie->pin = pin;
-  ie->next = NULL;
   ie->dead = 0;
-  sim.ieq.in->next = ie;
-  sim.ieq.in = ie;
-    // in theory sim.ieq.in is always meant to be filled
-    // by at least one event
-  ++sim.ieq.size;
-
-  pthread_kill(sim.loopThread, SIGUSR1);
-
-  //printf("addInterrupt: %d %d\n", sim.freeInterrupt, sim.nextInterrupt); //&&&&&&&
   
+  ieLink->content = (void *)ie;
+  ieLink->next = NULL;
+  pushInQueue(ieLink, &sim.ieq);
+  pthread_kill(sim.loopThread, SIGUSR1);
 }
 
 void iEventHandler(int _){
   sim.interrupted = 1;
   while(1) {
-    IEvent *ie = sim.ieq.out;
+    Link *ieLink = sim.ieq.out;
+    IEvent *ie = (IEvent *)ieLink->content;
     // TODO: test the pin is the right kind
     // test out is not NULL, etc
     if (ie->dead) {
@@ -817,11 +871,12 @@ void iEventHandler(int _){
     
     
     if (ie->dead) {
-      if (ie->next != NULL) {
+      if (ieLink->next != NULL) {
         // physically delete it only if
         // ieq won't end up empty bc of it
-        sim.ieq.out = ie->next;
+        sim.ieq.out = ieLink->next;
         free(ie);
+        free(ieLink);
         continue;
       }
       else { // we took care of all events
