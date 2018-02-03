@@ -15,8 +15,8 @@ TrafficControl trafficControls[BIGN];
 int trafficControlCount = 0;
 ShiftRegister registers[BIGN];
 int registerCount = 0;
-Spy spyValues[BIGN];
-int spyValuesCount = 0;
+Spy spies[BIGN];
+int spiesCount = 0;
 Queue displayed;
 
 
@@ -330,11 +330,11 @@ int _printDigitalDisplay(ShiftRegister * reg){
 }
 
 void spy(int *pointer, char *name, int (*printer)(int val)){
-  if (spyValuesCount >= BIGN) return; // FAIL
+  if (spiesCount >= BIGN) return; // FAIL
   if (pointer == NULL) return; // ERROR
-  int ix = spyValuesCount;
-  Spy *spy = &spyValues[ix];
-  ++spyValuesCount;
+  int ix = spiesCount;
+  Spy *spy = &spies[ix];
+  ++spiesCount;
   spy->pointer = pointer;
   strcpyUpTo(spy->name, name, SIZE_NAME);
   spy->printer = printer;
@@ -366,9 +366,9 @@ int _printSpy(Spy *spy){
 
 // void spyWithPrinter(int *pointer, char *name, int (*printer)(int val)){
 //   int ix = spy(pointer, name);
-//   if (ix < 0 || ix >= spyValuesCount) return; //FAIL/ERROR/BUG
+//   if (ix < 0 || ix >= spiesCount) return; //FAIL/ERROR/BUG
 //   if (printer == NULL) return; //ERROR
-//   Spy *spy = &spyValues[ix];
+//   Spy *spy = &spies[ix];
 //   int i, nextStart = 0;
 //   // for (i = 0; i < symbolLimit; i++) {
 //   //   nextStart = copyToSpace(spy->symbols[i], symbols + nextStart);

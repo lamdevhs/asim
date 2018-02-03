@@ -325,8 +325,8 @@ extern TrafficControl trafficControls[BIGN];
 extern int trafficControlCount;
 extern ShiftRegister registers[BIGN];
 extern int registerCount;
-extern Spy spyValues[BIGN];
-extern int spyValuesCount;
+extern Spy spies[BIGN];
+extern int spiesCount;
 extern Queue displayed;
 
 extern char *termColors[8];

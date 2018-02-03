@@ -8,8 +8,8 @@ int winRowSize;
 int winColSize;
 
 void *_threadDisplay(void *_) {
+  struct winsize winsize;
   while (1) {
-    struct winsize winsize;
     ioctl(STDOUT_FILENO, TIOCGWINSZ, &winsize);
     winRowSize = winsize.ws_row;
     winColSize = winsize.ws_col;
@@ -100,9 +100,9 @@ void _printDisplay() { // (int row, int col){
 
   // printing spy values
   // printf("spy values:\n"); curRow++;
-  // for (i = 0; i < spyValuesCount && curRow < row - 1; i++){
+  // for (i = 0; i < spiesCount && curRow < row - 1; i++){
   //   printTAB;
-  //   printSpy(&spyValues[i]);
+  //   printSpy(&spies[i]);
   //   curRow++;
   // }
 
