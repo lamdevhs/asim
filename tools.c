@@ -4,10 +4,10 @@
 #include "asim.h"
 
 
-void setDisplayName(char *dest, char *src){
+void strcpyUpTo(char *dest, char *src, int sup){
   int len = strlen(src);
   int i;
-  for (i = 0; i < SIZE_NAME - 1; i++) {
+  for (i = 0; i < sup - 1; i++) {
     if (i >= len) {
       dest[i] = '\0';
     }
@@ -16,7 +16,7 @@ void setDisplayName(char *dest, char *src){
     }
   }
 
-  dest[SIZE_NAME - 1] = '\0';
+  dest[sup - 1] = '\0';
 }
 
 
@@ -28,8 +28,6 @@ void pushInQueue(Link *link, Queue *queue){
 }
 
 
-
-
 void copyList(int *xs, int *into, int size){
   int i;
   for (i = 0; i < size; i++){
@@ -38,10 +36,27 @@ void copyList(int *xs, int *into, int size){
 }
 
 void printList(int *xs, int size){
-  int i;
+  int i; //, diviser;
+  // for (i = size - 1; i > 0; i--){
+  //   if (size % i == 0) {
+  //     diviser = i;
+  //     break;
+  //   }
+  // }
   for (i = 0; i < size - 1; i++){
     printf("%d ", xs[i]);
+    // if ((i % diviser) == (diviser - 1)) {
+    //   printf("_ ");
+    // }
   }
   printf("%d", xs[size - 1]);
 }
 
+int countLines(char *str){
+  int i;
+  int out = 1;
+  for (i = 0; str[i] != '\0'; i++) {
+    if (str[i] == '\n') ++out;
+  }
+  return out;
+}

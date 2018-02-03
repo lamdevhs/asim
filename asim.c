@@ -1,19 +1,7 @@
-// #include <string.h>
-//#include <stdio.h>
-// #include <stdlib.h>
-
-// #include <sys/ioctl.h> // ioctl, TIOCGWINSZ
-#include <unistd.h> // usleep
-// #include <pthread.h> // pthread_t, pthread_self
-
-// #include <signal.h> // signal, SIGUSR1
-
+#include <unistd.h>
 #include "asim.h"
 
-
-
-
-
+// functions simulating those used in codes that target arduinos
 
 
 int delay(int ms){
@@ -30,7 +18,7 @@ int delay(int ms){
 
 
 void pinMode(int pinIx, PinMode mode){
-  if (!checkDigital(pinIx)) {
+  if (!_isValidDigital(pinIx)) {
     return; // ERROR
   }
   DigitalPin *pin = &sim.pins[pinIx];
@@ -56,7 +44,7 @@ void attachInterrupt(int interrIx, void (*interrFun)(void), InterruptMode mode){
 
 
 void digitalWrite(int pinIx, int value){
-  if (!checkDigital(pinIx) || sim.pins[pinIx].mode != OUTPUT) {
+  if (!_isValidDigital(pinIx) || sim.pins[pinIx].mode != OUTPUT) {
     return; // ERROR? or input pullup stuff? TODO
   }
   if (value != LOW && value != HIGH) return; // ERROR? or default value? TODO
@@ -65,7 +53,7 @@ void digitalWrite(int pinIx, int value){
 
 
 int digitalRead(int pinIx){
-  if (!checkDigital(pinIx)) {
+  if (!_isValidDigital(pinIx)) {
     return -1;
   }
   PinMode mode = sim.pins[pinIx].mode;
@@ -76,7 +64,7 @@ int digitalRead(int pinIx){
 }
 
 void analogWrite(int pinIx, int value){
-  if (!checkDigital(pinIx) || sim.pins[pinIx].mode != OUTPUT) {
+  if (!_isValidDigital(pinIx) || sim.pins[pinIx].mode != OUTPUT) {
     return; // ERROR
   }
   DigitalPin *pin = &sim.pins[pinIx];
@@ -88,7 +76,7 @@ void analogWrite(int pinIx, int value){
 }
 
 int digitalPinToInterrupt(int pinIx){
-  if (!checkDigital(pinIx)) return -1; //ERROR
+  if (!_isValidDigital(pinIx)) return -1; //ERROR
   DigitalPin *pin = &sim.pins[pinIx];
   if (!pin->canInterrupt) return -1; //ERROR
   return pin->interrIx;

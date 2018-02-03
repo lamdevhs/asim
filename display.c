@@ -4,16 +4,21 @@
 
 #include "asim.h"
 
-void *threadDisplay(void *_) {
+int winRowSize;
+int winColSize;
+
+void *_threadDisplay(void *_) {
   while (1) {
     struct winsize winsize;
     ioctl(STDOUT_FILENO, TIOCGWINSZ, &winsize);
-    printDisplay(winsize.ws_row, winsize.ws_col);
+    winRowSize = winsize.ws_row;
+    winColSize = winsize.ws_col;
+    _printDisplay();
     usleep(DISPLAY_FREQ);
   }
 }
 
-void addToDisplayList(void *object, int (*printer)(void *o)){
+void _addToDisplayed(void *object, int (*printer)(void *o)){
   Printable *printable = (Printable *)malloc(sizeof(Printable));
   printable->object = object;
   printable->printer = printer;
@@ -31,7 +36,7 @@ void addToDisplayList(void *object, int (*printer)(void *o)){
 // int printInterr();
 // int printEv(IEvent *ie);
 
-void printDisplay(int row, int col){
+void _printDisplay() { // (int row, int col){
   int curRow = 0;
   int curCol = 0;
   int i;
@@ -50,56 +55,56 @@ void printDisplay(int row, int col){
   else printf("\n");
   curRow++;
 
-  // // printing diods
-  // printf("diods:\n"); curRow++;
-  // for (i = 0; i < diodCount && curRow < row - 1; i++){
+  // // printing diodes
+  // printf("diodes:\n"); curRow++;
+  // for (i = 0; i < diodeCount && curRow < row - 1; i++){
   //   printTAB;
-  //   printDiod(&diods[i]);
+  //   _printDiode(&diodes[i]);
   //   curRow++;
   // }
 
-  // printing rgb diods
-  printf("RGB diods:\n"); curRow++;
-  for (i = 0; i < diodRGBCount && curRow < row - 1; i++){
-    printTAB;
-    printDiodRGB(&diodRGBs[i]);
-    curRow++;
-  }
+  // // printing rgb diodes
+  // printf("RGB diodes:\n"); curRow++;
+  // for (i = 0; i < tricolorCount && curRow < row - 1; i++){
+  //   printTAB;
+  //   printTricolor(&tricolors[i]);
+  //   curRow++;
+  // }
 
-  printf("registers:\n"); curRow++;
-  for (i = 0; i < registerCount && curRow < row - 1; i++){
-    printTAB;
-    if (registers[i].printer != NULL) {
-      curRow += registers[i].printer(&registers[i]);
-    }
-    else {
-      printRegister(&registers[i]);
-      curRow++;
-    }
-  }
+  // printf("registers:\n"); curRow++;
+  // for (i = 0; i < registerCount && curRow < row - 1; i++){
+  //   printTAB;
+  //   if (registers[i].printer != NULL) {
+  //     curRow += registers[i].printer(&registers[i]);
+  //   }
+  //   else {
+  //     printRegister(&registers[i]);
+  //     curRow++;
+  //   }
+  // }
 
-  printf("Traffic diods:\n"); curRow++;
-  for (i = 0; i < trafficCount && curRow < row - 1; i++){
-    printTAB;
-    printTraffic(&traffics[i]);
-    curRow++;
-  }
+  // printf("TrafficControl diodes:\n"); curRow++;
+  // for (i = 0; i < trafficControlCount && curRow < row - 1; i++){
+  //   printTAB;
+  //   printTrafficControl(&trafficControls[i]);
+  //   curRow++;
+  // }
 
-  // printing buttons
-  printf("buttons:\n"); curRow++;
-  for (i = 0; i < buttonCount && curRow < row - 1; i++){
-    printTAB;
-    printButton(&buttons[i]);
-    curRow++;
-  }
+  // // printing buttons
+  // printf("buttons:\n"); curRow++;
+  // for (i = 0; i < buttonCount && curRow < row - 1; i++){
+  //   printTAB;
+  //   printButton(&buttons[i]);
+  //   curRow++;
+  // }
 
-  // printing spied values
-  printf("spied values:\n"); curRow++;
-  for (i = 0; i < spiedValuesCount && curRow < row - 1; i++){
-    printTAB;
-    printSpied(&spiedValues[i]);
-    curRow++;
-  }
+  // printing spy values
+  // printf("spy values:\n"); curRow++;
+  // for (i = 0; i < spyValuesCount && curRow < row - 1; i++){
+  //   printTAB;
+  //   printSpy(&spyValues[i]);
+  //   curRow++;
+  // }
 
   //   //debug ********
   // printf("\n[[DEBUG]]\n"); curRow+=2;
@@ -108,11 +113,12 @@ void printDisplay(int row, int col){
 
 
   
-  // fill screen
-  for (; curRow < row - 1; curRow++){
+  // fill up the remaining lines
+  for (; curRow < winRowSize - 1; curRow++){
     printNL;
   }
 }
+
 
 
 

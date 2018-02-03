@@ -14,13 +14,13 @@ void main(void){
     // creates the virtual objects
 
   signal(SIGUSR1, iEventHandler);
-  launchThreads();
+  _launchThreads();
 }
 
 
-void launchThreads(void){
+void _launchThreads(void){
   pthread_t tid;
-  pthread_create(&tid, NULL, threadDisplay, NULL);
+  pthread_create(&tid, NULL, _threadDisplay, NULL);
   pthread_create(&tid, NULL, threadLoop, NULL);
   pthread_create(&tid, NULL, threadListener, NULL);
   pthread_exit(NULL);

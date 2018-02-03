@@ -5,7 +5,7 @@
 
 // tmp
 extern Arduino sim;
-extern Diod diods[];
+extern Diode diodes[];
 
 // to make it work:
 int red = 0, yellow = 1, btn = 2;
@@ -40,11 +40,11 @@ void setup(void){
   pinMode(bt2, INPUT_PULLUP);
   pinMode(bt3, INPUT_PULLUP);
   pinMode(bt4, INPUT_PULLUP);
-  // diod rgb
+  // diode rgb
   pinMode(r, OUTPUT);
   pinMode(g, OUTPUT);
   pinMode(b, OUTPUT);
-  // traffic
+  // trafficControl
   pinMode(tR, OUTPUT);
   pinMode(tY, OUTPUT);
   pinMode(tG, OUTPUT);
@@ -144,6 +144,12 @@ void loop(void){
   //onIfon(bt2, r);
   //onIfon(bt3, g);
   //onIfon(bt4, b);
+  digitalWrite(tR, HIGH);
+  digitalWrite(tY, HIGH);
+  digitalWrite(tG, HIGH);
+  digitalWrite(r, HIGH);
+  digitalWrite(g, HIGH);
+  digitalWrite(b, HIGH);
   delay(1000);
   xvar++;
   yvar = (yvar + 1) % COLN;
@@ -176,18 +182,19 @@ int colorz(int val) {
 
 #ifdef __ASIM__
 void init(void){
-  arduino(UNO);
-  diod(red, "red");
-  diod(yellow, "yellow");
+  arduino(MEGA);
+  diode(red, "red");
+  diode(yellow, "yellow");
   button(btn, "one", 'c');
   button(bt2, "red", 'r');
   button(bt3, "green", 'g');
+  separation('#');
   button(bt4, "blue", 'b');
-  diodRGB(r, g, b, "foo");
-  traffic(tR, tY, tG, "horizon");
+  tricolor(r, g, b, "foo");
+  trafficControl(tR, tY, tG, "horizon");
   digitalDisplay(rg1, rg2, rg3, "myreg");
-  spy(&xvar, "xvar");
-  spyWithPrinter(&yvar, "color", colorz);
+  spy(&xvar, "xvar", NULL);
+  spy(&yvar, "color", colorz);
 }
 
 #endif
