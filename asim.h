@@ -10,7 +10,10 @@
 #define BIGN 50
 #define SIZE_NAME 100
 #define SIZE_LINE 200
+#define STRSIZE(nb) (nb * sizeof(char))
 #define DISPLAY_FREQ 50*1000
+
+#define NWARN_MSG 25
 
 
 
@@ -109,10 +112,12 @@ typedef struct arduino {
     // the interrupt number to give to attachInterrupt()
   Queue ieq;
     // ^ interrupt events queue
-  pthread_t loopThread;
+  pthread_t userCodeThread;
     // ^ used to send it a pthread signal
+    // to simulate the interruptions
   Bool interrupted;
-    // ^ is loopThread currently treating an interruption?
+    // ^ is userCodeThread currently treating an interruption?
+
 } Arduino;
 
 typedef struct diode
@@ -171,7 +176,9 @@ typedef struct reg
     // set to 1 so the hidden memory
     // also be visible
   
-  int (*printer)(struct reg * reg); // special displayer
+  int (*printer)(int *in, int *out, int size);
+    // optional custom displayer
+    // can be provided by the user
 } ShiftRegister;
 
 typedef struct spy
@@ -196,7 +203,7 @@ typedef struct staticMessage {
 
 // NOTE: aside from the functions in "tools.c",
 // internal functions all start with an underscore
-// (aside from main of course)
+// (aside from main() of course)
 // global variable don't follow that rule
 // but none of them is meant to be directly
 // accessed by the user anyway.
@@ -239,10 +246,11 @@ typedef struct staticMessage {
   void trafficControl(int rIx, int oIx, int gIx, char *name);
   void shiftRegister(
     int valIx, int pushIx, int sendIx, char *name, int size,
-    int (*printer)(ShiftRegister *), Bool allVisible
+    int (*printer)(int *in, int *out, int size), Bool allVisible
   );
     void digitalDisplay(int valIx, int pushIx, int sendIx, char *name);
   void spy(int *pointer, char *name, int (*printer)(int val));
+  void staticMessage(char *message);
    // void spyWithPrinter(int *pointer, char *name, int (*printer)(int value));
 
   // individual printers (displayers) for those objects:
@@ -255,10 +263,10 @@ typedef struct staticMessage {
   int _printTrafficControl(TrafficControl *trafficControl);
   int _printTricolor(Tricolor *tricolor);
   int _printShiftRegister(ShiftRegister * reg);
-    int _printDigitalDisplay(ShiftRegister * reg);
+    int _printDigitalDisplay(int *input, int *output, int size);
   int _printSpy(Spy *spy);
 
-  int printStaticMessage(void *o);
+  int _printStaticMessage(StaticMessage *msg);
 
   void printTricolor(Tricolor *tricolor);
     int getMainColor(int r, int g, int b);
@@ -272,8 +280,8 @@ typedef struct staticMessage {
 // display.c
   extern int winRowSize;
   extern int winColSize;
-  void *_threadDisplay(void *_);
-  void _printDisplay(); //(int row, int col);
+  void *_threadView(void *_);
+  void _printView(); //(int row, int col);
   void _addToDisplayed(void *object, int (*printer)(void *o));
 
 // tools.c
@@ -282,16 +290,16 @@ typedef struct staticMessage {
   int countLines(char *str);
         
   
-  void *threadLoop(void *_);
+  void *_threadUserCode(void *_);
   /*
   void *threadInterruptions(void *_);
   */
-    void digitalChange(DigitalPin *pin, int newValue, int fromListener);
+    void _digitalChangeValue(DigitalPin *pin, int newValue, int fromListener);
     #define SWITCH 2
     void addInterrupt(DigitalPin *pin);
-    void iEventHandler(int _);
+    void _interruptSignalHandler(int _);
 
-  void *threadListener(void *_);
+  void *_threadListener(void *_);
 
 
 void registerPush(void *reg, DigitalPin *pin, int oldVal);
@@ -301,10 +309,9 @@ void shiftList(int *xs, int size, int val);
 void copyList(int *xs, int *into, int size);
 void printList(int *xs, int size);
 
-#define NB_ENABLE 0
-#define NB_DISABLE 1
-void nonblock(int state);
-Bool kbhit(void);
+// #define NB_ENABLE 0
+// #define NB_DISABLE 1
+void _noReturnNeededKBEvent(int state);
 
 #define printNL printf("\n")
 #define printTAB printf("\t")
@@ -331,8 +338,14 @@ extern Queue displayed;
 
 extern char *termColors[8];
 
+extern int winRowSize;
+extern int winColSize;
 
+extern pthread_t threadView;
+  
 
+void _killThreadView(void);
+void _fatalError(char *type, char *fn, char *message);
 
 #endif // FILE_ASIM // wrapper
 
@@ -387,4 +400,13 @@ extern char *termColors[8];
 /* security:
    * test for char *name pointers to be null
 
+*/
+
+/*
+- user.c
+- event.c
+- error.c
+- view.c
+- tools.c
+- main.c (includes variables and threads)
 */

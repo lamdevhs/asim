@@ -1,11 +1,50 @@
 #include <stdlib.h>
 #include <signal.h> // signal, SIGUSR1
+#include <termios.h>
+#include <pthread.h>
+#include <unistd.h> // STDIN_FILENO
 #include "asim.h"
+
+void _noReturnNeededKBEvent(Bool yes){
+    struct termios ttystate;
+    //get the terminal state
+    tcgetattr(STDIN_FILENO, &ttystate);
+ 
+    if (yes) {
+        //turn off canonical mode
+        ttystate.c_lflag &= ~ICANON;
+        //minimum of number input read.
+        ttystate.c_cc[VMIN] = 1;
+    }
+    else {
+        //turn on canonical mode
+        ttystate.c_lflag |= ICANON;
+    }
+    //set the terminal attributes.
+    tcsetattr(STDIN_FILENO, TCSANOW, &ttystate);
+}
+
+void *_threadListener(void *_){
+  int i;
+  char c;
+  Button *button;
+  while (1) {
+    c = fgetc(stdin);
+    
+    for (i = 0; i < buttonCount; i++){
+      button = &buttons[i];
+      if (button->key == c) {
+        _digitalChangeValue(button->pin, SWITCH, 1);
+        button->isPressed = 1 - button->isPressed;
+      }
+    }
+  }
+}
 
 
 
 // interruptions
-void digitalChange(DigitalPin *pin, int newValue, int fromListener){
+void _digitalChangeValue(DigitalPin *pin, int newValue, int fromListener){
   int oldValue = pin->value;
   if (newValue == SWITCH) newValue = (oldValue == 0);
   
@@ -19,7 +58,7 @@ void digitalChange(DigitalPin *pin, int newValue, int fromListener){
 
   if (!fromListener) return;
     // ^ for now we don't allow interruptions
-    // triggered from loopThread
+    // triggered from userCodeThread
 
   if (pin->canInterrupt) {
     int changed = (newValue != oldValue);
@@ -41,7 +80,7 @@ void digitalChange(DigitalPin *pin, int newValue, int fromListener){
     else if (mode == CHANGE) addInterrupt(pin);
 
     else return; // BUG wrong value
-    //pthread_kill(sim.loopThread, SIGUSR1);
+    //pthread_kill(sim.userCodeThread, SIGUSR1);
   }
 }
 
@@ -62,10 +101,10 @@ void addInterrupt(DigitalPin *pin){
   ieLink->content = (void *)ie;
   ieLink->next = NULL;
   pushInQueue(ieLink, &sim.ieq);
-  pthread_kill(sim.loopThread, SIGUSR1);
+  pthread_kill(sim.userCodeThread, SIGUSR1);
 }
 
-void iEventHandler(int _){
+void _interruptSignalHandler(int _){
   sim.interrupted = 1;
   while(1) {
     Link *ieLink = sim.ieq.out;

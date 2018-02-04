@@ -193,6 +193,7 @@ void init(void){
   tricolor(r, g, b, "foo");
   trafficControl(tR, tY, tG, "horizon");
   digitalDisplay(rg1, rg2, rg3, "myreg");
+  shiftRegister(rg1, rg2, rg3, "myreg", 16, NULL, 1);
   spy(&xvar, "xvar", NULL);
   spy(&yvar, "color", colorz);
 }

@@ -4,20 +4,20 @@
 #include "asim.h"
 
 
-void strcpyUpTo(char *dest, char *src, int sup){
-  int len = strlen(src);
-  int i;
-  for (i = 0; i < sup - 1; i++) {
-    if (i >= len) {
-      dest[i] = '\0';
-    }
-    else {
-      dest[i] = src[i];
-    }
-  }
+// void strcpyUpTo(char *dest, char *src, int sup){
+//   int len = strlen(src);
+//   int i;
+//   for (i = 0; i < sup - 1; i++) {
+//     if (i >= len) {
+//       dest[i] = '\0';
+//     }
+//     else {
+//       dest[i] = src[i];
+//     }
+//   }
 
-  dest[sup - 1] = '\0';
-}
+//   dest[sup - 1] = '\0';
+// }
 
 
 void pushInQueue(Link *link, Queue *queue){
@@ -59,4 +59,12 @@ int countLines(char *str){
     if (str[i] == '\n') ++out;
   }
   return out;
+}
+
+void shiftList(int *xs, int size, int val){
+  int i;
+  for (i = 1; i < size; i++){
+    xs[size - i] = xs[size - i - 1];
+  }
+  xs[0] = val;
 }
