@@ -1,29 +1,14 @@
 #include <stdlib.h>
 #include <signal.h> // signal, SIGUSR1
-#include <termios.h>
 #include <pthread.h>
-#include <unistd.h> // STDIN_FILENO
 #include "asim.h"
 
-void _noReturnNeededKBEvent(Bool yes){
-    struct termios ttystate;
-    //get the terminal state
-    tcgetattr(STDIN_FILENO, &ttystate);
- 
-    if (yes) {
-        //turn off canonical mode
-        ttystate.c_lflag &= ~ICANON;
-        //minimum of number input read.
-        ttystate.c_cc[VMIN] = 1;
-    }
-    else {
-        //turn on canonical mode
-        ttystate.c_lflag |= ICANON;
-    }
-    //set the terminal attributes.
-    tcsetattr(STDIN_FILENO, TCSANOW, &ttystate);
-}
 
+//| thread responsible for continuously waiting
+//| for a character on stdin, then changing the
+//| state of all buttons whose Button.key is this character.
+//| the use of _digitalChangeValue() allows interruptions
+//| to be generated thus.
 void *_threadListener(void *_){
   int i;
   char c;
@@ -42,8 +27,15 @@ void *_threadListener(void *_){
 }
 
 
-
-// interruptions
+//| changes the state of the pin.
+//| this wrapper is used to trigger potential events.
+//| if it exists, calls the onChange event handler for the pin.
+//| adds an interruption to the queue (via _addInterrupt)
+//| if the conditions match:
+//| * if the pin can interrupt (is one of the interrupt pins)
+//| * the change of value matches the event meant to trigger
+//|   the interruption.
+//| cf attachInterrupt().
 void _digitalChangeValue(DigitalPin *pin, int newValue, int fromListener){
   int oldValue = pin->value;
   if (newValue == SWITCH) newValue = (oldValue == 0);
@@ -58,7 +50,7 @@ void _digitalChangeValue(DigitalPin *pin, int newValue, int fromListener){
 
   if (!fromListener) return;
     // ^ for now we don't allow interruptions
-    // triggered from userCodeThread
+    // triggered from threadUserCode
 
   if (pin->canInterrupt) {
     int changed = (newValue != oldValue);
@@ -67,32 +59,32 @@ void _digitalChangeValue(DigitalPin *pin, int newValue, int fromListener){
     if (mode == NO_INTERR) return;
 
     else if (mode == LOW || mode == HIGH){
-      if (newValue == mode) addInterrupt(pin);
+      if (newValue == mode) _addInterrupt(pin);
     }
     else if (!changed) return;
 
     else if (mode == RISING) {
-      if (newValue == HIGH) addInterrupt(pin);
+      if (newValue == HIGH) _addInterrupt(pin);
     }
     else if (mode == FALLING) {
-      if (newValue == LOW) addInterrupt(pin);
+      if (newValue == LOW) _addInterrupt(pin);
     }
-    else if (mode == CHANGE) addInterrupt(pin);
+    else if (mode == CHANGE) _addInterrupt(pin);
 
-    else return; // BUG wrong value
-    //pthread_kill(sim.userCodeThread, SIGUSR1);
+    else {
+      //| wrong mode value; should never happen
+      _fatalError("BUG", "_digitalChangeValue",
+        "unknown pin.interrMode encountered");
+    }
   }
 }
 
-
-
-void addInterrupt(DigitalPin *pin){
+//| add an interruption to the queue, and then
+//| calls for an interruption of the userCode thread.
+void _addInterrupt(DigitalPin *pin){
   if (!pin->canInterrupt) return; // BUG!
 
   IEvent *ie = (IEvent *)malloc(sizeof(IEvent));
-    // ^ this variable name already being cursed
-    // i won't bother checking for null pointer
-    // TODO
   Link *ieLink = (Link *)malloc(sizeof(Link));
 
   ie->pin = pin;
@@ -100,14 +92,15 @@ void addInterrupt(DigitalPin *pin){
   
   ieLink->content = (void *)ie;
   ieLink->next = NULL;
-  pushInQueue(ieLink, &sim.ieq);
-  pthread_kill(sim.userCodeThread, SIGUSR1);
+  pushInQueue(ieLink, &ardu.ieq);
+  pthread_kill(threadUserCode, SIGUSR1);
 }
 
+//| handler called when threadUserCode receives SIGUSR1
 void _interruptSignalHandler(int _){
-  sim.interrupted = 1;
+  ardu.interrupted = 1;
   while(1) {
-    Link *ieLink = sim.ieq.out;
+    Link *ieLink = ardu.ieq.out;
     IEvent *ie = (IEvent *)ieLink->content;
     // TODO: test the pin is the right kind
     // test out is not NULL, etc
@@ -128,7 +121,7 @@ void _interruptSignalHandler(int _){
           ie->dead = 1; // don't delete the current event
       }
       else {
-        --sim.ieq.size;
+        --ardu.ieq.size;
       }
     }
     
@@ -137,7 +130,7 @@ void _interruptSignalHandler(int _){
       if (ieLink->next != NULL) {
         // physically delete it only if
         // ieq won't end up empty bc of it
-        sim.ieq.out = ieLink->next;
+        ardu.ieq.out = ieLink->next;
         free(ie);
         free(ieLink);
         continue;
@@ -147,5 +140,5 @@ void _interruptSignalHandler(int _){
       }
     }
   }
-  sim.interrupted = 0;
+  ardu.interrupted = 0;
 }

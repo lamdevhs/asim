@@ -1,21 +1,20 @@
 #include <pthread.h>
 #include <stdlib.h>
 #include "asim.h"
-/*
-  there are different types of errors:
-  - bugs: which should never happen. crash (program can't tell what to do)
-  - failure: filled up all the static memory for virtual objects, for example.
-      in a reasonable usage, it should never happen. crash or error report.
-  - user error: wrong use of a pin, of a function. either crash, or error report.
 
-  warnings;
-  - doubtful user usage of some function (like digitalWrite on an input,
-    which changes the pullup state)
-  -
+//| types of error (non-exhaustive):
+//| - internal/bugs: things that should never happen,
+//|   but if it does, better have a clear message
+//|   before it crashes
+//| - user errors: misuse of the simulation, trying
+//|   to do absurd things like using a pin that doesn't exist
+//| - failures: limitations of the program, eg:
+//|   creating more than 'BIGN' diodes, buttons, etc,
+//|   is impossible due to (reasonable) limitations of the static
+//|   declarations of the simulation variables. maybe in the future
+//|   i'll use dynamic structures instead, although that doesn't seem
+//|   really useful...
 
-*/
-
-pthread_t threadView;
 
 void _killThreadView(void){
   pthread_cancel(threadView);

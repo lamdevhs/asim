@@ -7,6 +7,9 @@
 #include "asim.h"
 
 Queue displayed;
+  //| ^ queue of Printable elements,
+  //| filled with everything that is
+  //| displayed continuously by _threadView().
 
 char *termColors[8] = {
   "\x1B[31m",
@@ -17,13 +20,14 @@ char *termColors[8] = {
   "\x1B[36m",
   "\x1B[37m",
   "\x1B[0m"
-};
+}; //| cf TermColor enum defined in the header
 
 int winRowSize;
 int winColSize;
+  //| useful to completely fill the terminal
+  //| global because _printSeparator() needs it
 
-
-
+//| continuously print the state of the simulation to stdout
 void *_threadView(void *_) {
   threadView = pthread_self();
   struct winsize winsize;
@@ -36,6 +40,7 @@ void *_threadView(void *_) {
   }
 }
 
+//| add a printable object to the global var `displayed`
 void _addToDisplayed(void *object, int (*printer)(void *o)){
   Printable *printable = (Printable *)malloc(sizeof(Printable));
   printable->object = object;
@@ -47,16 +52,12 @@ void _addToDisplayed(void *object, int (*printer)(void *o)){
 }
 
 
-
-
-
-// *************************
-// int printInterr();
-// int printEv(IEvent *ie);
-
-void _printView() { // (int row, int col){
+//| print the simulation state once
+void _printView(void) {
   int curRow = 0;
-  int curCol = 0;
+    //| cursor row; used to know
+    //| how many newlines to add at the end
+    //| to fill the terminal entirely
   int i;
   
   printNL; curRow++;
@@ -69,111 +70,42 @@ void _printView() { // (int row, int col){
     link = link->next;
   }
 
-  if (sim.interrupted) printf("[[interruption]]\n");
+  if (ardu.interrupted) printf("[[interruption]]\n");
   else printf("\n");
   curRow++;
 
-  // // printing diodes
-  // printf("diodes:\n"); curRow++;
-  // for (i = 0; i < diodeCount && curRow < row - 1; i++){
-  //   printTAB;
-  //   _printDiode(&diodes[i]);
-  //   curRow++;
-  // }
-
-  // // printing rgb diodes
-  // printf("RGB diodes:\n"); curRow++;
-  // for (i = 0; i < tricolorCount && curRow < row - 1; i++){
-  //   printTAB;
-  //   printTricolor(&tricolors[i]);
-  //   curRow++;
-  // }
-
-  // printf("registers:\n"); curRow++;
-  // for (i = 0; i < registerCount && curRow < row - 1; i++){
-  //   printTAB;
-  //   if (registers[i].printer != NULL) {
-  //     curRow += registers[i].printer(&registers[i]);
-  //   }
-  //   else {
-  //     printRegister(&registers[i]);
-  //     curRow++;
-  //   }
-  // }
-
-  // printf("TrafficControl diodes:\n"); curRow++;
-  // for (i = 0; i < trafficControlCount && curRow < row - 1; i++){
-  //   printTAB;
-  //   printTrafficControl(&trafficControls[i]);
-  //   curRow++;
-  // }
-
-  // // printing buttons
-  // printf("buttons:\n"); curRow++;
-  // for (i = 0; i < buttonCount && curRow < row - 1; i++){
-  //   printTAB;
-  //   printButton(&buttons[i]);
-  //   curRow++;
-  // }
-
-  // printing spy values
-  // printf("spy values:\n"); curRow++;
-  // for (i = 0; i < spiesCount && curRow < row - 1; i++){
-  //   printTAB;
-  //   printSpy(&spies[i]);
-  //   curRow++;
-  // }
-
-  //   //debug ********
-  // printf("\n[[DEBUG]]\n"); curRow+=2;
-  // int ls = printInterr();
-  // curRow += ls;
-
-
-  
   // fill up the remaining lines
   for (; curRow < winRowSize - 1; curRow++){
     printNL;
   }
 }
 
+//| Printable.printer for the Spy(ardu.interrupted)
+//| cf arduino()
+int _printIsInterrupted(int isInterrupted){
+  printf(isInterrupted ? "interrupted" : "setup/loop");
+  return 0;
+}
 
 
-
-
-
-  // //DEBUG
-  // int printInterr(){
-  //   int ls = 0;
-  //   printf("output\n"); ++ls;
-  //   IEvent *ie = (IEvent *)sim.ieq.out->content;
-  //   if (ie == NULL){
-  //     printf("!!! NULL\n");
-  //     return ++ls;
-  //   }
-  //   while(printEv(ie)){
-  //     ++ls;
-  //     ie = ie->next;
-  //     if (ie == NULL){
-  //       printf("NULL\n");
-  //       return ++ls;
-  //     }
-  //   }
-  //   return ++ls;
-  // }
-
-  // int printEv(Link *ieLink){
-  //   IEvent *ie = (IEvent *)ieLink->content;
-  //   printf("in: %d, out: %d, dead: %d, next is null: %d\n",
-  //     ieLink == sim.ieq.in, ieLink == sim.ieq.out,
-  //     ie->dead, ieLink->next == NULL);
-
-  //   if (ie->next == NULL) return 0;
-  //   else return 1;
-  // }
-
-  // // ---
-
+void _state2Str(DigitalPin *pin, char *str){
+  if (pin->value == LOW) {
+    //| same representation, be it LOW-digital
+    //| or 0-analog
+    sprintf(str, "   ");
+  }
+  else if (pin->isAnalog) {
+    sprintf(str, "%3d", pin->value);
+  }
+  else if (pin->value == HIGH){
+    sprintf(str, "###");
+  }
+  else { //| this should never happen
+    _fatalError("BUG", "_state2Str",
+      "digital pin not set as analog output "
+      "but with value neither HIGH nor LOW");
+  }
+}
 
 int _printDiode(Diode *diode){
   char state[4];
@@ -182,8 +114,6 @@ int _printDiode(Diode *diode){
   printNL;
   return countLines(diode->name);
 }
-
-
 
 int _printButton(Button *button){
   char state[4];
@@ -194,41 +124,35 @@ int _printButton(Button *button){
   return countLines(button->name);
 }
 
-
-
-int _printTricolor(Tricolor *tricolor){
+int _printTricolor(Tricolor *rgbLED){
   char redState[4], greenState[4], blueState[4];
-  _state2Str(tricolor->red, redState);
-  _state2Str(tricolor->green, greenState);
-  _state2Str(tricolor->blue, blueState);
+  _state2Str(rgbLED->red, redState);
+  _state2Str(rgbLED->green, greenState);
+  _state2Str(rgbLED->blue, blueState);
 
   printf("RGB\t[%s%s%s|%s%s%s|%s%s%s] %s",
     termColors[RED], redState, termColors[NONE],
     termColors[GREEN], greenState, termColors[NONE],
     termColors[BLUE], blueState, termColors[NONE],
-    tricolor->name);
+    rgbLED->name);
   printNL;
-  return countLines(tricolor->name);
+  return countLines(rgbLED->name);
 }
 
-
-
-int _printTrafficControl(TrafficControl *trafficControl){
+int _printTrafficControl(TrafficControl *traffic){
   char redState[4], greenState[4], orangeState[4];
-  _state2Str(trafficControl->red, redState);
-  _state2Str(trafficControl->green, greenState);
-  _state2Str(trafficControl->orange, orangeState);
+  _state2Str(traffic->red, redState);
+  _state2Str(traffic->green, greenState);
+  _state2Str(traffic->orange, orangeState);
 
   printf("traffic\t[%s%s%s|%s%s%s|%s%s%s] %s",
     termColors[RED], redState, termColors[NONE],
     termColors[ORANGE], orangeState, termColors[NONE],
     termColors[GREEN], greenState, termColors[NONE],
-    trafficControl->name);
+    traffic->name);
   printNL;
-  return countLines(trafficControl->name);
+  return countLines(traffic->name);
 }
-
-
 
 int _printShiftRegister(ShiftRegister * reg){
   printf("reg\t%s:\n", reg->name);
@@ -247,174 +171,83 @@ int _printShiftRegister(ShiftRegister * reg){
     return !!reg->allVisible + 1 + countLines(reg->name);
   }
   else {
-    return reg->printer(reg->input, reg->output, reg->size);
+    return countLines(reg->name)
+      + reg->printer(reg->input, reg->output, reg->size);
   }
 }
 
-
-
+//| print a digital display in ascii art:
+/*
+# _    _  #
+#|_|  |_| #
+#|_|. |_|.#
+*/
+//| output[0 -> 7] represents the leftmost digit and its dot,
+//| in this order:
+/*
+ _    0
+|_|  561
+|_|. 4327
+*/
+//| likewise for the second part of the 16-bit shift register
 int _printDigitalDisplay(int *input, int *output, int size){
   // first line
   printf("# ");
-  if (output[0]) printf("_");
-  else printf(" ");
+  printf(output[0] ? "_" : " ");
   printf("    ");
-  if (output[0 + 8]) printf("_");
-  else printf(" ");
+  printf(output[0+8] ? "_" : " ");
   printf("  #");
   printNL;
   // line 2
   printf("#");
-  if (output[5]) printf("|");
-  else printf(" ");
-  if (output[6]) printf("_");
-  else printf(" ");
-  if (output[1]) printf("|");
-  else printf(" ");
+  printf(output[5] ? "|" : " ");
+  printf(output[6] ? "_" : " ");
+  printf(output[1] ? "|" : " ");
   printf("  ");
-  if (output[5+8]) printf("|");
-  else printf(" ");
-  if (output[6+8]) printf("_");
-  else printf(" ");
-  if (output[1+8]) printf("|");
-  else printf(" ");
+  printf(output[5+8] ? "|" : " ");
+  printf(output[6+8] ? "_" : " ");
+  printf(output[1+8] ? "|" : " ");
   printf(" #");
   printNL;
   // line 3
   printf("#");
-  if (output[4]) printf("|");
-  else printf(" ");
-  if (output[3]) printf("_");
-  else printf(" ");
-  if (output[2]) printf("|");
-  else printf(" ");
-  if (output[7]) printf(".");
-  else printf(" ");
+  printf(output[4] ? "|" : " ");
+  printf(output[3] ? "_" : " ");
+  printf(output[2] ? "|" : " ");
+  printf(output[7] ? "." : " ");
   printf(" ");
-  if (output[4+8]) printf("|");
-  else printf(" ");
-  if (output[3+8]) printf("_");
-  else printf(" ");
-  if (output[2+8]) printf("|");
-  else printf(" ");
-  if (output[7+8]) printf(".");
-  else printf(" ");
+  printf(output[4+8] ? "|" : " ");
+  printf(output[3+8] ? "_" : " ");
+  printf(output[2+8] ? "|" : " ");
+  printf(output[7+8] ? "." : " ");
   printf("#");
   printNL;
-
-  return 3; // number of lines printed
+  return 3; //| number of lines printed
 }
-
-
 
 int _printSpy(Spy *spy){
-  printf("spy\t");
-  if (spy->printer == NULL)
-    printf("%s = %d", spy->name, *spy->pointer);
-  else {
-    printf("%s = ", spy->name);
-    if (spy->printer(*spy->pointer) == -1){
-      printf("%d", *spy->pointer);
-    }
-  }
+  printf("spy\t%s = ", spy->name);
+  if (spy->printer == NULL
+    || spy->printer(*spy->pointer) == -1)
+    //| ^ custom printer is NULL or failed
+    //| so we merely print the value as int:
+    printf("%d", *spy->pointer);
   printNL;
   return countLines(spy->name);
-  // }
-  // else {
-  //   //TODO check spy->pointer didn't get null
-  //   int val = *spy->pointer;
-  //   if (val >= 0 && val < spy->symbolLimit) {
-  //     printf("%s = %s", spy->name, spy->symbols[val]);
-  //   }
-  // }
 }
-
-// void spyWithPrinter(int *pointer, char *name, int (*printer)(int val)){
-//   int ix = spy(pointer, name);
-//   if (ix < 0 || ix >= spiesCount) return; //FAIL/ERROR/BUG
-//   if (printer == NULL) return; //ERROR
-//   Spy *spy = &spies[ix];
-//   int i, nextStart = 0;
-//   // for (i = 0; i < symbolLimit; i++) {
-//   //   nextStart = copyToSpace(spy->symbols[i], symbols + nextStart);
-//   //   if (nextStart == -1) break;
-//   // }
-//   //spy->symbols = symbols;
-//   // spy->symbolLimit = symbolLimit;
-//   spy->printer = printer;
-// }
-
-
-
-
-
-
-void _state2Str(DigitalPin *pin, char *str){
-  if (pin->value == LOW) {
-    sprintf(str, "   ");
-  }
-  else if (pin->isAnalog) {
-    sprintf(str, "%3d", pin->value);
-  }
-  else if (pin->value == HIGH){
-    sprintf(str, "###");
-  }
-  else {
-    sprintf(str, "???");
-    // bug!
-  }
-}
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
 int _printStaticMessage(StaticMessage *msg){
   printf("%s\n", msg->message);
-  return countLines(msg->message); // TODO depends on presence of \n's in the message
+  return countLines(msg->message);
 }
 
 
-// void printTricolor(Tricolor *tricolor){
-//   char redState[4], greenState[4], blueState[4];
-//   _state2Str(tricolor->red, redState);
-//   _state2Str(tricolor->green, greenState);
-//   _state2Str(tricolor->blue, blueState);
-  
-//   printf("%s [%s %s %s] *%3s %5s %4s*",
-//     tricolor->name,
-//     redState, greenState, blueState,
-//     (tricolor->red->value != 0) ? "RED" : "",
-//     (tricolor->green->value != 0) ? "GREEN" : "",
-//     (tricolor->blue->value != 0) ? "BLUE" : ""
-//   );
-//   printNL;
-// }
-
-
-
-
-
-
-
-int _printSeparation(char *cpointer){
+int _printSeparator(char *cpointer){
   int i;
   for (i = 0; i < winColSize - 1; ++i)
     printf("%c", *cpointer);
   printNL;
   return 1;
 }
-
-

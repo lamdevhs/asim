@@ -3,78 +3,74 @@
 #include <string.h>
 #include "asim.h"
 
-Arduino sim;
+Arduino ardu;
   // ^ the simulated arduino
 Diode diodes[BIGN];
 int diodeCount = 0;
 Button buttons[BIGN];
 int buttonCount = 0;
-Tricolor tricolors[BIGN];
-int tricolorCount = 0;
-TrafficControl trafficControls[BIGN];
-int trafficControlCount = 0;
+Tricolor rgbLEDs[BIGN];
+int rgbLEDCount = 0;
+TrafficControl traffics[BIGN];
+int trafficCount = 0;
 ShiftRegister registers[BIGN];
 int registerCount = 0;
 Spy spies[BIGN];
 int spiesCount = 0;
 
+
+
 void *_threadUserCode(void *_) {
-  sim.userCodeThread = pthread_self();
   setup();
   while (1) {
     loop();
   }
 }
 
-// =====================================
-// == Functions to be called from init()
+//| =====================================
+//| == Functions to be called from init()
+//| == (aside from the underscored ones)
 
 void arduino(ArduinoType type){
   int i;
 
-  sim.type = type;
+  ardu.type = type;
 
-    // dummy event, solely there to prevent
-    // the queue to ever be empty
+    //| dummy event, solely there to prevent
+    //| the queue to ever be empty
+    //| this being a relatively scrappy way
+    //| to handle access to the same queue
+    //| from two different threads... better do it
+    //| with mutex, in future versions...
   IEvent *ie = (IEvent *)malloc(sizeof(IEvent));
-  Link *ieLink = (Link *)malloc(sizeof(Link));
-    // TODO check null ptr
-
   ie->pin = NULL;
   ie->dead = 1;
 
+  Link *ieLink = (Link *)malloc(sizeof(Link));
   ieLink->content = (void *)ie;
 
-  sim.ieq.in = ieLink;
-  sim.ieq.out = ieLink;
-  sim.ieq.size = 0;
+  ardu.ieq.in = ieLink;
+  ardu.ieq.out = ieLink;
+  ardu.ieq.size = 0;
 
-  sim.interrupted = 0;
+  ardu.interrupted = 0;
 
-  // first thing in the display list
+  //|first thing in the display list
   staticMessage("Simulator for code Arduino.");
-  // StaticMessage *welcome =
-  //   (StaticMessage *)malloc(sizeof(StaticMessage));
-  // Link *welcomeLink = (Link *)malloc(sizeof(Link));
-  // Printable *welcomePrintable = (Printable *)malloc(sizeof(Printable));
-
-  // strncpy(welcome->message, "Simulator for code Arduino.", STRSIZE(SIZE_LINE));
-  // welcomePrintable->object = (void *)welcome;
-  // welcomePrintable->printer = printStaticMessage;
-  // welcomeLink->content = (void *)welcomePrintable;
-
-  // displayed.in = welcomeLink;
-  // displayed.out = welcomeLink;
+  spy(&ardu.interrupted, "user code state", _printIsInterrupted);
+  separator('/');
 
   DigitalPin *pin;
+
   for(i = 0; i < BIGN; i++){
-    pin = &sim.pins[i];
+    pin = &ardu.pins[i];
     pin->mode = MODE_NONE;
     pin->value = LOW;
-    pin->canAnalog = 1; // will depend
+    pin->canAnalog = 1;
+      //| will depend, in later versions
     pin->isAnalog = 0;
 
-    pin->canInterrupt = 0; // will depend
+    pin->canInterrupt = 0;
     pin->interrMode = NO_INTERR;
     pin->interrIx = -1;
     pin->interrFun = NULL;
@@ -82,19 +78,21 @@ void arduino(ArduinoType type){
     pin->onChange = NULL;
     pin->onChangeArg = NULL;
 
-    sim.interrupts[i] = NULL;
+    ardu.interrupts[i] = NULL;
+      //| ^ no connection with the rest of the loop
+      //| both arrays just have the same BIGN size
   }
 
   if (type == UNO) {
-    sim.minDigital = 0;
-    sim.maxDigital = 13;
+    ardu.minDigital = 0;
+    ardu.maxDigital = 13;
     
     _defineInterrupt(2, 0);
     _defineInterrupt(3, 1);
   }
   else if (type == MEGA) {
-    sim.minDigital = 0;
-    sim.maxDigital = 53;
+    ardu.minDigital = 0;
+    ardu.maxDigital = 53;
 
     _defineInterrupt(2, 0);
     _defineInterrupt(3, 1);
@@ -102,6 +100,9 @@ void arduino(ArduinoType type){
     _defineInterrupt(19, 4);
     _defineInterrupt(20, 3);
     _defineInterrupt(21, 2);
+      //| ^ from the specs.
+      //| whoever chose this correspondence...
+      //| no comment.
   }
   else {
     _fatalError("USER", "arduino", "unknown type of arduino");
@@ -110,19 +111,20 @@ void arduino(ArduinoType type){
 
 void _defineInterrupt(int pinIx, int interrIx){
   // TODO check range of input values
-  DigitalPin *pin = &sim.pins[pinIx];
-  sim.interrupts[interrIx] = pin;
-  sim.interrupts[1] = &sim.pins[3];
+  DigitalPin *pin = &ardu.pins[pinIx];
+  ardu.interrupts[interrIx] = pin;
+  ardu.interrupts[1] = &ardu.pins[3];
   pin->canInterrupt = 1;
   pin->interrIx = interrIx;
 }
 
 
-
+//| validity of the pin number based on the type
+//| of arduino chosen for the simulation.
 Bool _isValidDigital(int pinIx){
   return (
-    sim.minDigital <= pinIx &&
-    pinIx <= sim.maxDigital
+    ardu.minDigital <= pinIx &&
+    pinIx <= ardu.maxDigital
   );
 }
 
@@ -132,7 +134,8 @@ void _checkValidDigital(int pinIx, char *fn){
       "pin number invalid for this type of arduino");
 }
 
-
+//| two-state simple output
+//| can receive analog values too.
 void diode(int pinIx, char *name){
   if (diodeCount >= BIGN) return; // FAILURE
   _checkValidDigital(pinIx, "diode");
@@ -140,11 +143,15 @@ void diode(int pinIx, char *name){
   Diode *diode = &diodes[diodeCount];
   ++diodeCount;
   strncpy(diode->name, name, STRSIZE(SIZE_NAME));
-  diode->pin = &sim.pins[pinIx];
+  diode->pin = &ardu.pins[pinIx];
 
   _addToDisplayed((void *)diode, (int (*)(void *))_printDiode);
 }
 
+//| the button state is controlled by the user
+//| via keyboard: the `key` char switches its state.
+//| warning: you therefore need to hit twice the key
+//| to simulate a press-then-released event.
 void button(int pinIx, char *name, char key) {
   if (buttonCount >= BIGN) {
     return; // FAILURE
@@ -154,49 +161,61 @@ void button(int pinIx, char *name, char key) {
   Button *button = &buttons[buttonCount];
   ++buttonCount;
   strncpy(button->name, name, STRSIZE(SIZE_NAME));
-  button->pin = &sim.pins[pinIx];
+  button->pin = &ardu.pins[pinIx];
   button->key = key;
   button->isPressed = 0;
 
   _addToDisplayed((void *)button, (int (*)(void *))_printButton);
 }
 
-void tricolor(int rIx, int gIx, int bIx, char *name){
-  if (tricolorCount >= BIGN){
+//| i think this virtual object is rather self-descriptive.
+void rgbLED(int rIx, int gIx, int bIx, char *name){
+  if (rgbLEDCount >= BIGN){
     return; // FAILURE
   }
-  _checkValidDigital(rIx, "tricolor");
-  _checkValidDigital(gIx, "tricolor");
-  _checkValidDigital(bIx, "tricolor");
+  _checkValidDigital(rIx, "rgbLED");
+  _checkValidDigital(gIx, "rgbLED");
+  _checkValidDigital(bIx, "rgbLED");
 
-  Tricolor *tricolor = &tricolors[tricolorCount];
-  ++tricolorCount;
-  strncpy(tricolor->name, name, STRSIZE(SIZE_NAME));
-  tricolor->red = &sim.pins[rIx];
-  tricolor->green = &sim.pins[gIx];
-  tricolor->blue = &sim.pins[bIx];
+  Tricolor *rgbLED = &rgbLEDs[rgbLEDCount];
+  ++rgbLEDCount;
+  strncpy(rgbLED->name, name, STRSIZE(SIZE_NAME));
+  rgbLED->red = &ardu.pins[rIx];
+  rgbLED->green = &ardu.pins[gIx];
+  rgbLED->blue = &ardu.pins[bIx];
 
-  _addToDisplayed((void *)tricolor, (int (*)(void *))_printTricolor);
+  _addToDisplayed((void *)rgbLED, (int (*)(void *))_printTricolor);
 }
 
-void trafficControl(int rIx, int oIx, int gIx, char *name){
-  if (trafficControlCount >= BIGN) {
+//| represents traffic lights, those evil things that torment
+//| cars and pedestrians alike.
+//| similar to the rgbLED, but with a slightly different visual
+//| representation.
+void traffic(int rIx, int oIx, int gIx, char *name){
+  if (trafficCount >= BIGN) {
     return; // FAIL
   }
-  _checkValidDigital(rIx, "trafficControl");
-  _checkValidDigital(oIx, "trafficControl");
-  _checkValidDigital(gIx, "trafficControl");
+  _checkValidDigital(rIx, "traffic");
+  _checkValidDigital(oIx, "traffic");
+  _checkValidDigital(gIx, "traffic");
 
-  TrafficControl *trafficControl = &trafficControls[trafficControlCount];
-  ++trafficControlCount;
-  strncpy(trafficControl->name, name, STRSIZE(SIZE_NAME));
-  trafficControl->red = &sim.pins[rIx];
-  trafficControl->orange = &sim.pins[oIx];
-  trafficControl->green = &sim.pins[gIx];
+  TrafficControl *traffic = &traffics[trafficCount];
+  ++trafficCount;
+  strncpy(traffic->name, name, STRSIZE(SIZE_NAME));
+  traffic->red = &ardu.pins[rIx];
+  traffic->orange = &ardu.pins[oIx];
+  traffic->green = &ardu.pins[gIx];
 
-  _addToDisplayed((void *)trafficControl, (int (*)(void *))_printTrafficControl);
+  _addToDisplayed((void *)traffic, (int (*)(void *))_printTrafficControl);
 }
 
+//| valIx is for the pin that presents a new value
+//| pushIx will make use of DigitalPin.onChange to
+//| push the value of valIx in the hidden memory,
+//| shifting the whole of it, erasing the last value
+//| in a FIFO manner.
+//| sendIx sends the hidden, temporary memory into the
+//| visible one.
 void shiftRegister(
   int valIx, int pushIx, int sendIx, char *name, int size,
   int (*printer)(int *in, int *out, int), Bool allVisible
@@ -212,9 +231,9 @@ void shiftRegister(
   ShiftRegister *reg = &registers[ix];
   ++registerCount;
   strncpy(reg->name, name, STRSIZE(SIZE_NAME));
-  reg->value = &sim.pins[valIx];
-  reg->push = &sim.pins[pushIx];
-  reg->send = &sim.pins[sendIx];
+  reg->value = &ardu.pins[valIx];
+  reg->push = &ardu.pins[pushIx];
+  reg->send = &ardu.pins[sendIx];
   reg->size = size;
   reg->input = (int *)malloc(size*sizeof(int));
   reg->output = (int *)malloc(size*sizeof(int));
@@ -222,33 +241,42 @@ void shiftRegister(
   reg->allVisible = allVisible;
   reg->printer = printer;
 
-  reg->push->onChange = registerPush;
+  reg->push->onChange = _registerPush;
   reg->push->onChangeArg = reg;
-  reg->send->onChange = registerSend;
+  reg->send->onChange = _registerSend;
   reg->send->onChangeArg = reg;
 
   _addToDisplayed((void *)reg, (int (*)(void *))_printShiftRegister);
 }
 
-void registerPush(void *reg, DigitalPin *pin, int oldVal){
+void _registerPush(void *reg, DigitalPin *pin, int oldVal){
   ShiftRegister *r = (ShiftRegister *)reg;
   if (oldVal == LOW && pin->value == HIGH) {
     shiftList(r->input, r->size, r->value->value);
   }
 }
-void registerSend(void *reg, DigitalPin *pin, int oldVal){
+void _registerSend(void *reg, DigitalPin *pin, int oldVal){
   ShiftRegister *r = (ShiftRegister *)reg;
   if (oldVal == LOW && pin->value == HIGH) {
     copyList(r->input, r->output, r->size);
   }
 }
 
+//| special kind of shiftRegister, used to simulate a 2-digit,
+//| 2-dotted display, which will then look like:
+//| #      _  #
+//| #|_|   _| #
+//| #  |. |_ .#
+//| cf _printDigitalDisplay()
 void digitalDisplay(int valIx, int pushIx, int sendIx, char *name){
   shiftRegister(
     valIx, pushIx, sendIx, name,
     16, _printDigitalDisplay, 0);
 }
 
+//| allows the user to view a real-time value of some
+//| custom, user-defined int variable, with the option
+//| to provide a custom printer.
 void spy(int *pointer, char *name, int (*printer)(int val)){
   if (spiesCount >= BIGN) return; // FAIL
   if (pointer == NULL) return; // ERROR
@@ -262,6 +290,9 @@ void spy(int *pointer, char *name, int (*printer)(int val)){
   _addToDisplayed((void *)spy, (int (*)(void *))_printSpy);
 }
 
+//| prints a static (never changing) message.
+//| everything will be printed in the order defined by
+//| the user-written init().
 void staticMessage(char *content){
     // first thing in the display list
   StaticMessage *smessage = (StaticMessage *)malloc(sizeof(StaticMessage));
@@ -269,11 +300,13 @@ void staticMessage(char *content){
   _addToDisplayed((void *)smessage, (int (*)(void *))_printStaticMessage);
 }
 
-void separation(char c){
+//| prints a line full of one character
+//| repeated ad nauseam
+void separator(char c){
   if (c == 0) c = '-';
   char *cpointer = malloc(sizeof(char));
   *cpointer = c;
-  _addToDisplayed((void *)cpointer, (int (*)(void *))_printSeparation);
+  _addToDisplayed((void *)cpointer, (int (*)(void *))_printSeparator);
 }
 
 
@@ -281,25 +314,43 @@ void separation(char c){
 // ==============================================
 // == Functions to be called from setup(), loop()
 
+
+//| usleep() gets prematurely stopped if a signal
+//| is sent to the process/thread that uses it.
+//| so we cut the desired delay into small intervals.
+//| when an error is detected, the interval is redone.
+//| obviously it means the time spent waiting will
+//| depend on external factors, but it'll always be
+//| at least equal to `ms` millisecs.
 int delay(int ms){
   while(ms) {
     int ans = usleep(10*1000);
     if (ans != 0) {
-      // some error happened, probably signal
+      //| some error impeded usleep's normal behavior,
+      //| probably signal()
       continue;
     }
     else ms -= 10;
   }
 }
 
-
-
+//| the INPUT_PULLUP mode is handled in this
+//| very limited fashion: the default state
+//| becomes HIGH, and gets LOW when the button
+//| is being pressed.
+//| (this sim doesn't have any other INPUTs so far.)
 void pinMode(int pinIx, PinMode mode){
   _checkValidDigital(pinIx, "pinMode");
-  
-  DigitalPin *pin = &sim.pins[pinIx];
+
+  DigitalPin *pin = &ardu.pins[pinIx];
   if (pin->mode != MODE_NONE){
+    // attempting to set the mode
+    // of a pin a second time
     // WARNING?
+  }
+  if (mode < OUTPUT || mode >= MODE_NONE) {
+    _fatalError("USER", "pinMode",
+      "mode given in arg is invalid");
   }
   pin->mode = mode;
 
@@ -309,51 +360,91 @@ void pinMode(int pinIx, PinMode mode){
 }
 
 void attachInterrupt(int interrIx, void (*interrFun)(void), InterruptMode mode){
-  // check validity of mode
-  if (interrIx < 0 || BIGN <= interrIx) return; // ERROR
-  DigitalPin *pin = sim.interrupts[interrIx];
-  if (pin == NULL) return; // ERROR
-  if (!pin->canInterrupt) return; // BUG!
+  if (mode < LOW || mode >= NO_INTERR)
+    _fatalError("USER", "attachInterrupt",
+      "invalid interrupt mode");
+  if (interrIx < 0 || BIGN <= interrIx) 
+    _fatalError("USER", "attachInterrupt",
+      "invalid interrupt index");
+  
+  DigitalPin *pin = ardu.interrupts[interrIx];
+  if (pin == NULL)
+    _fatalError("USER", "attachInterrupt",
+      "invalid interrupt index");
+  
+  if (!pin->canInterrupt) // should never happen
+    _fatalError("BUG", "attachInterrupt",
+      "interrupt associated to pin that can't interrupt");
+  
+  if (pin->mode != INPUT_PULLUP && pin->mode != INPUT)
+    // could be a mere warning... i'm not sure...
+    _fatalError("USER", "attachInterrupt",
+      "pin mode is not set as INPUT or INPUT_PULLUP");
+  
   pin->interrFun = interrFun;
   pin->interrMode = mode;
 }
 
+void _checkPinModeSet(DigitalPin *pin, char *fn){
+  if (pin->mode == MODE_NONE) {
+    _fatalError("USER", fn, "pin mode not set");
+  }
+}
 
 void digitalWrite(int pinIx, int value){
-  if (!_isValidDigital(pinIx) || sim.pins[pinIx].mode != OUTPUT) {
-    return; // ERROR? or input pullup stuff? TODO
+  _checkValidDigital(pinIx, "digitalWrite");
+  DigitalPin *pin = &ardu.pins[pinIx];
+  _checkPinModeSet(pin, "digitalWrite");
+    
+
+  if (pin->mode == INPUT || pin->mode == INPUT_PULLUP) {
+    //| should issue a warning, this is weird behavior overall
+    //| but that's apparently part of the specs:
+    //| digitalWrite over an INPUT changes the pullup state of it
+    //| aka default, off state is HIGH
+    //| not sure if it can cause the triggering of an interrupt..
+    //| into doubt, let's say it does:
+    _digitalChangeValue(pin, value, 0);
   }
-  if (value != LOW && value != HIGH) return; // ERROR? or default value? TODO
-  _digitalChangeValue(&sim.pins[pinIx], value, 0);
+  _digitalChangeValue(pin, value, 0);
 }
 
-
+//| still don't know if you can read from an output pin...
+//| into doubt, it's a fatal error, there :P
 int digitalRead(int pinIx){
-  if (!_isValidDigital(pinIx)) {
-    return -1;
-  }
-  PinMode mode = sim.pins[pinIx].mode;
-  if (mode != INPUT && mode != INPUT_PULLUP){
-    return -1; //error?
-  }
-  return sim.pins[pinIx].value;
+  _checkValidDigital(pinIx, "digitalRead");
+  DigitalPin *pin = &ardu.pins[pinIx];
+  _checkPinModeSet(pin, "digitalRead");
+
+  if (pin->mode != INPUT && pin->mode != INPUT_PULLUP)
+    _fatalError("USER", "digitalRead",
+      "pin mode is not set as INPUT or INPUT_PULLUP");
+  return pin->value;
 }
+
 
 void analogWrite(int pinIx, int value){
-  if (!_isValidDigital(pinIx) || sim.pins[pinIx].mode != OUTPUT) {
-    return; // ERROR
+  _checkValidDigital(pinIx, "analogWrite");
+  DigitalPin *pin = &ardu.pins[pinIx];
+  _checkPinModeSet(pin, "analogWrite");
+
+  if (pin->mode != OUTPUT) {
+    _fatalError("USER", "analogWrite",
+      "pin mode is not set as OUTPUT");
   }
-  DigitalPin *pin = &sim.pins[pinIx];
   if (!pin->canAnalog) {
-    return; // ERROR
+    _fatalError("USER", "analogWrite",
+      "this digital pin cannot be used as analog output");
   }
   pin->value = min(max(0, value), 255);
   pin->isAnalog = 1;
 }
 
 int digitalPinToInterrupt(int pinIx){
-  if (!_isValidDigital(pinIx)) return -1; //ERROR
-  DigitalPin *pin = &sim.pins[pinIx];
-  if (!pin->canInterrupt) return -1; //ERROR
+  _checkValidDigital(pinIx, "digitalPinToInterrupt");
+  DigitalPin *pin = &ardu.pins[pinIx];
+  if (!pin->canInterrupt)
+    _fatalError("USER", "digitalPinToInterrupt",
+      "this digital pin cannot be used as interrupt");
   return pin->interrIx;
 }

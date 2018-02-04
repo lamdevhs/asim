@@ -1,0 +1,94 @@
+
+TODO:
+  make so pinMode checks the expected value of the mode based on what kind
+  of object the pin is bound to via init();
+  * allow rgbLED to only have two or even one color, without
+  having to give dummy pin numbers
+  use static to try to avoid polluting the namespace of client code
+  what happens if analog is sent to an INPUT connected to an interrupt?
+  cases:
+    calling write/read/analog for wrong types
+    defining a button/diode/etc for wrong type
+    handle pullup thing better
+    delay when ardu.interrupted
+check:
+    what happens when you try to set the value
+    of something connected to a button
+    (if it's INPUT, in theory, it changes the pullup option value)
+  
+ideas:
+  * pause button (but can still use buttons to modify state,
+  and therefore execute interruptions)
+  * freeze button (stop everything)
+  * print to display anything
+  * print static titles in between virtual objects
+  * print value of some variable in real time (with pointer)
+    * maybe permit to give an array of symbolic strings
+    * to replace the dry int version
+    * esp for booleans
+  * change display to reflect any order the use wants
+  * allows adding separations in the display
+  * make the display of all virtual objects generic:
+  typedef struct visible {
+    void *object;
+    void (*printer)(void *object);
+  } Visible;
+
+  * use malloc instead of static sizes of displayed text
+  * the functions used to create virtual objects must NOT work
+    outside of the init function!!!! and arduino() MUST
+    be called before anything else!
+
+security:
+   * test for char *name pointers to be null
+   * malloc failures?
+
+
+
+different types of errors:
+- bugs: which should never happen. crash (program can't tell what to do)
+- failure: filled up all the static memory for virtual objects, for example.
+    in a reasonable usage, it should never happen. crash or error report.
+- user error: wrong use of a pin, of a function. either crash, or error report.
+
+warnings;
+- doubtful user usage of some function (like digitalWrite on an input,
+  which changes the pullup state)
+-
+
+
+---------------------------------------------
+
+// pinMode
+//   if prevmode != NONE: error
+// attachInterrupt
+//   -> event listener
+// digitalWrite
+//   if mode != OUTPUT: error
+//   -> event listener
+// digitalRead
+//   if mode != INPUT: error
+
+// ---analogRead
+// analogWrite
+// delay
+// timers
+
+// create buttons,
+// define names for colors, etc
+// ardu
+// initialize global var `arduino`
+// create event listeners (buttons, etc)
+// call setup: modifies `arduino` and event handling
+// forever:
+//   call loop (only sets a list of things to do)
+//   while todo not empty
+//     do one thing
+//       case of delay: merely defines a variable to decrement depending on time spent... except time spend during interruptions
+//     check kb event, if true: launch listener
+//     else: redo
+
+// three threads: simulator, printer, and listener
+// listener modifies state of buttons, and calls interruptions (or maybe puts it as next todo, in delay or outside of loop)
+// simulator loops over loop, maybe calls interruptions
+// printer continuously prints the state of the system (read only)

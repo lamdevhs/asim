@@ -4,7 +4,7 @@
 #endif
 
 // tmp
-extern Arduino sim;
+extern Arduino ardu;
 extern Diode diodes[];
 
 // to make it work:
@@ -44,7 +44,7 @@ void setup(void){
   pinMode(r, OUTPUT);
   pinMode(g, OUTPUT);
   pinMode(b, OUTPUT);
-  // trafficControl
+  // traffic
   pinMode(tR, OUTPUT);
   pinMode(tY, OUTPUT);
   pinMode(tG, OUTPUT);
@@ -188,51 +188,17 @@ void init(void){
   button(btn, "one", 'c');
   button(bt2, "red", 'r');
   button(bt3, "green", 'g');
-  separation('#');
+  separator('#');
+  
   button(bt4, "blue", 'b');
-  tricolor(r, g, b, "foo");
-  trafficControl(tR, tY, tG, "horizon");
+  rgbLED(r, g, b, "foo");
+  traffic(tR, tY, tG, "horizon");
+
   digitalDisplay(rg1, rg2, rg3, "myreg");
-  shiftRegister(rg1, rg2, rg3, "myreg", 16, NULL, 1);
+  //shiftRegister(rg1, rg2, rg3, "myreg", 16, NULL, 1);
+
   spy(&xvar, "xvar", NULL);
   spy(&yvar, "color", colorz);
 }
 
 #endif
-
-//---------------
-
-
-// pinMode
-//   if prevmode != NONE: error
-// attachInterrupt
-//   -> event listener
-// digitalWrite
-//   if mode != OUTPUT: error
-//   -> event listener
-// digitalRead
-//   if mode != INPUT: error
-
-// ---analogRead
-// analogWrite
-// delay
-// timers
-
-// create buttons,
-// define names for colors, etc
-// sim
-// initialize global var `arduino`
-// create event listeners (buttons, etc)
-// call setup: modifies `arduino` and event handling
-// forever:
-//   call loop (only sets a list of things to do)
-//   while todo not empty
-//     do one thing
-//       case of delay: merely defines a variable to decrement depending on time spent... except time spend during interruptions
-//     check kb event, if true: launch listener
-//     else: redo
-
-// three threads: simulator, printer, and listener
-// listener modifies state of buttons, and calls interruptions (or maybe puts it as next todo, in delay or outside of loop)
-// simulator loops over loop, maybe calls interruptions
-// printer continuously prints the state of the system (read only)

@@ -1,106 +1,154 @@
 #ifndef FILE_ASIM
 #define FILE_ASIM
 
-#include <pthread.h> // pthread_t
+//| one header to rule them all...
+
+#include <pthread.h> //| pthread_t
 #include <stdio.h>
-  // for using printf in SYMCASE macro
+  //| ^ for using printf in macro SYMCASE
 
-#define dbgprintf printf
 
-#define BIGN 50
-#define SIZE_NAME 100
-#define SIZE_LINE 200
-#define STRSIZE(nb) (nb * sizeof(char))
-#define DISPLAY_FREQ 50*1000
+// NOTE: aside from the functions in "tools.c",
+// internal functions all start with an underscore
+// (aside from main() of course)
+// global variable don't follow that rule
+// but none of them is meant to be directly
+// accessed by the user anyway.
 
-#define NWARN_MSG 25
+
+// user-written (`abstract`) functions
+  void setup(void);
+  void loop(void);
+
+  void init(void);
+    // ^ called before the rest,
+    // allows the user to set up
+    // the simulated arduino and
+    // define other virtual objects
+    // cf user.c
 
 
 
 
 typedef int Bool;
 
-typedef enum {
- RED,
- GREEN,
- ORANGE,
- BLUE,
- MAGENTA,
- CYAN,
- WHITE,
- NONE
-} TermColor;
+#define dbgprintf printf
 
-typedef enum {
-  UNO,
-  MEGA
-} ArduinoType;
+//| general constant quantities
+  #define BIGN 100
+    //| ^ the amount of pins/diodes/buttons/etc
+    //| that gets statically allocated
+  #define SIZE_NAME 100
+    //| ^ max size for the name given by the user
+    //| when creating a diode/button/etc in init().
+    //| cf user.c
+  #define SIZE_LINE 200
+    //| ^ max size for static messages
+    //| aka messages constantly printed by _threadView()
+  #define DISPLAY_FREQ 50*1000
+    //| ^ cf _threadView()
 
-typedef enum {
-  OUTPUT,
-  INPUT,
-  INPUT_PULLUP,
-    // ^ will amount to setting HIGH as off state
-  INTERRUPT,
-  MODE_NONE
-} PinMode;
+//| shortcuts
+  #define STRSIZE(nb) (nb * sizeof(char))
+  #define printNL printf("\n")
+  #define printTAB printf("\t")
+  #define min(a, b) (a < b ? a : b)
+  #define max(a, b) (a > b ? a : b)
 
-typedef enum {
-  LOW,
-  HIGH,
-  FALLING,
-  RISING,
-  CHANGE,
-  NO_INTERR
-} InterruptMode;
+//| various constant values
+  typedef enum {
+   RED,
+   GREEN,
+   ORANGE,
+   BLUE,
+   MAGENTA,
+   CYAN,
+   WHITE,
+   NONE
+  } TermColor;
+    //| cf view.c
+    //| esp the global variable `char *termColors[8]`
 
-#define LOW 0
-#define HIGH 1
-  // ^ for clarity's sake.
-  // obviously redundant since C
-  // has no type safety
+  typedef enum {
+    UNO,
+    MEGA
+  } ArduinoType;
+    //| ^ cf arduino()
+    //| this list might grow in the future
+    //| to include more types of arduinos
 
-// -------- Queue
-typedef struct link
-{
-  void *content;
-  struct link *next;
-} Link;
+  typedef enum {
+    OUTPUT,
+    INPUT,
+    INPUT_PULLUP,
+      // ^ will amount to setting HIGH as off state
+    MODE_NONE
+  } PinMode;
+    //| ^ cf pinMode()
 
-typedef struct queue
-{
-  Link *in; // where elements are added
-  Link *out; // from where elements are treated/deleted
-  int size;
-} Queue;
-  // FIFO link-based queue
+  typedef enum {
+    LOW,
+    HIGH,
+    FALLING,
+    RISING,
+    CHANGE,
+    NO_INTERR
+  } InterruptMode;
+   //| ^ cf attachInterrupt()
 
+  #define LOW 0
+  #define HIGH 1
+    //| ^ for clarity's sake.
+    //| obviously redundant since C
+    //| has no type safety
+
+//| Queue
+  typedef struct link
+  {
+    void *content;
+    struct link *next;
+  } Link;
+
+  typedef struct queue
+  {
+    Link *in; //| where elements are added
+    Link *out; //| from where elements are treated/deleted
+    int size;
+  } Queue;
+  //| FIFO link-based queue
+
+
+
+//| =================================
+//| main structures of the simulation
 
 typedef struct digitalPin {
   PinMode mode;
-  int value; // HIGH or LOW or 0-255
-  Bool isAnalog; // is the current value analog?
-  Bool canAnalog; // can be used as analog output?
-  Bool canInterrupt; // can be used as interrupt?
-  int interrIx; // interrupt index in Arduino.interrupts
+  int value; //| HIGH or LOW or 0-255
+  Bool isAnalog; //| is the current value analog?
+  Bool canAnalog; //| can be used as analog output?
+  Bool canInterrupt; //| can be used as interrupt?
+  int interrIx; //| interrupt index in Arduino.interrupts
   InterruptMode interrMode;
-  void (*interrFun)(void); // function to call upon interruption
+  void (*interrFun)(void); //| function to call upon interruption
 
   void (*onChange)(void *arg, struct digitalPin *pin, int oldVal);
-    // ^ optional function to be called whenever the value changes
-    // useful for the (virtual) shift registers
-  void *onChangeArg; // argument for onChange
+    //| ^ optional function to be called whenever the value changes
+    //| useful for the (virtual) shift registers
+  void *onChangeArg; //| argument for onChange()
 } DigitalPin;
 
 typedef struct interruptEvent
 {
-  DigitalPin *pin; // pin that triggered the event
-  Bool dead; // signals that the event has been taken care of
+  DigitalPin *pin;
+    //| pin that triggered the event
+  Bool dead;
+    //| signals that the event has been taken care of
 } IEvent;
-  // interrupt event; mallocated
+  //| interrupt event; malloc()ated
+  //| to be queued, waiting to be processed
+  //| by _interruptSignalHandler()
 
-
-// --------- virtual objects, cf vobjects.c
 typedef struct arduino {
   ArduinoType type;
   DigitalPin pins[BIGN];
@@ -112,12 +160,8 @@ typedef struct arduino {
     // the interrupt number to give to attachInterrupt()
   Queue ieq;
     // ^ interrupt events queue
-  pthread_t userCodeThread;
-    // ^ used to send it a pthread signal
-    // to simulate the interruptions
   Bool interrupted;
-    // ^ is userCodeThread currently treating an interruption?
-
+    // ^ is threadUserCode currently treating an interruption?
 } Arduino;
 
 typedef struct diode
@@ -136,7 +180,7 @@ typedef struct button
     // to change the button state
 } Button;
 
-typedef struct tricolor
+typedef struct rgbLED
 {
   char name[SIZE_NAME];
   DigitalPin *red;
@@ -144,41 +188,42 @@ typedef struct tricolor
   DigitalPin *blue;
 } Tricolor;
 
-typedef struct trafficControl
+typedef struct traffic
 {
   char name[SIZE_NAME];
   DigitalPin *red;
   DigitalPin *orange;
   DigitalPin *green;
 } TrafficControl;
-  // ^ virtual trafficControl light
+  // ^ virtual traffic light
 
 typedef struct reg
 {
   char name[SIZE_NAME];
   DigitalPin *value; // value to be pushed
   DigitalPin *push;
-    // pushes the value from the 'left'
+    // ^ pushes the value from the 'left'
     // in the hidden memory
   DigitalPin *send;
     // ^ sends the hidden memory
     // to the visible memory
 
-  // ^^ implemented via DigitalPin.onChange
+  // ^^ behavior implemented via
+  // DigitalPin.onChange() and _digitalChangeValue()
 
-  int size; // in bits
+  int size; // in bits. one real int per virtual bit
 
   int *output; // visible/displayed memory
   int *input; // hidden memory
     // ^ malloc'ed arrays
 
   Bool allVisible;
-    // set to 1 so the hidden memory
-    // also be visible
+    // option for the user to give to shiftRegister()
+    // to make _threadView() display the hidden memory too
   
   int (*printer)(int *in, int *out, int size);
     // optional custom displayer
-    // can be provided by the user
+    // can be provided by the user via shiftRegister()
 } ShiftRegister;
 
 typedef struct spy
@@ -186,227 +231,156 @@ typedef struct spy
   char name[SIZE_NAME];
   int *pointer;
   int (*printer)(int value);
-
 } Spy;
+  //| allows real-time display of the value
+  //| of some user variable's value,
+  //| with optional custom printer
+
 #define SYMCASE(sym) case sym: printf(#sym); break
- // ^ to be used with enumerations, a switch, and Spy.printer
+  // ^ to be used with enumerations, a switch, and Spy.printer:
+  /*
+    enum {
+      Foo
+      Bar
+      Blah
+    };
+    int myCustomSpyPrinter(int value){
+      switch(value) {
+        SYMCASE(Foo);
+        SYMCASE(Bar);
+        SYMCASE(Blah);
+        default: return -1;
+      }
+    }
+  */
+
+typedef struct staticMessage {
+  char message[SIZE_LINE];
+} StaticMessage;
+  //| static messages, to be printed as is by _threadView()
+  //| (not related to the notion of static memory)
 
 typedef struct printable {
   void *object;
   int (*printer)(void *object);
 } Printable;
+  //| the *object will be a *Button, *Diode, *Spy, etc
+  //| its printer will be _printButton(), _printDiode(), etc.
+  //| cf view.c, esp _addToDisplayed()
 
-typedef struct staticMessage {
-  char message[SIZE_LINE];
-} StaticMessage;
 
 
-// NOTE: aside from the functions in "tools.c",
-// internal functions all start with an underscore
-// (aside from main() of course)
-// global variable don't follow that rule
-// but none of them is meant to be directly
-// accessed by the user anyway.
 
-// user-written (`abstract`) functions
-  void setup(void);
-  void loop(void);
+//| ======================================
+//| global, static variables and functions
 
-  void init(void);
-    // ^ called before the rest,
-    // allows the user to set up
-    // the simulated arduino and
-    // define other virtual objects
+//| ==== main.c
+  extern pthread_t threadView;
+    // ^ used in errors.c
+  extern pthread_t threadUserCode;
+    // ^ used to send USR1 to the corresponding thread
+    // to simulate the interruptions
+  extern pthread_t threadListener;
 
-// main.c
-  // this file mostly contains the stuff
-  // that i couldn't classify...
   void main(void);
   void _launchThreads(void);
+  void _noReturnNeededKBEvent(Bool yes);
 
+//| ==== user.c
+  extern Arduino ardu;
+     // ^ the simulated arduino
+  extern Diode diodes[BIGN];
+  extern int diodeCount;
+  extern Button buttons[BIGN];
+  extern int buttonCount;
+  extern Tricolor rgbLEDs[BIGN];
+  extern int rgbLEDCount;
+  extern TrafficControl traffics[BIGN];
+  extern int trafficCount;
+  extern ShiftRegister registers[BIGN];
+  extern int registerCount;
+  extern Spy spies[BIGN];
+  extern int spiesCount;
 
-// asim.c
-  // ^ functions simulating those used
-  // in code that targets arduinos
+  void *_threadUserCode(void *_);
+
+  //| functions to be called from init()
+  void arduino(ArduinoType type);
+  void diode(int pinIx, char *name);
+  void button(int pinIx, char *name, char key);
+  void rgbLED(int rIx, int gIx, int bIx, char *name);
+  void traffic(int rIx, int oIx, int gIx, char *name);
+  void shiftRegister(
+    int valIx, int pushIx, int sendIx, char *name, int size,
+    int (*printer)(int *in, int *out, int), Bool allVisible
+  );
+  void digitalDisplay(int valIx, int pushIx, int sendIx, char *name);
+  void spy(int *pointer, char *name, int (*printer)(int val));
+  void staticMessage(char *content);
+  void separator(char c);
+
+  //| internal stuff
+  void _defineInterrupt(int pinIx, int interrIx);
+  Bool _isValidDigital(int pinIx);
+  void _checkValidDigital(int pinIx, char *fn);
+  void _registerPush(void *reg, DigitalPin *pin, int oldVal);
+  void _registerSend(void *reg, DigitalPin *pin, int oldVal);
+
+  void _checkPinModeSet(DigitalPin *pin, char *fn);
+
+  //| functions to be called from setup() or loop()
   int delay(int ms);
   void pinMode(int pinIx, PinMode mode);
-  void attachInterrupt(int interrIx, void (*interrFun)(void), InterruptMode mode);
+  void attachInterrupt(
+    int interrIx, void (*interrFun)(void), InterruptMode mode);
   void digitalWrite(int pinIx, int value);
   int digitalRead(int pinIx);
   void analogWrite(int pinIx, int value);
   int digitalPinToInterrupt(int pinIx);
 
-// vobjects.c
-  // functions to set up / define virtual objects
-  void arduino(ArduinoType type);
-
-  void diode(int pinIx, char *name);
-  void button(int pinIx, char *name, char key);
-  void tricolor(int rIx, int gIx, int bIx, char *name);
-  void trafficControl(int rIx, int oIx, int gIx, char *name);
-  void shiftRegister(
-    int valIx, int pushIx, int sendIx, char *name, int size,
-    int (*printer)(int *in, int *out, int size), Bool allVisible
-  );
-    void digitalDisplay(int valIx, int pushIx, int sendIx, char *name);
-  void spy(int *pointer, char *name, int (*printer)(int val));
-  void staticMessage(char *message);
-   // void spyWithPrinter(int *pointer, char *name, int (*printer)(int value));
-
-  // individual printers (displayers) for those objects:
-
-  void separation(char c);
-  int _printSeparation(char *cpointer);
-  
-  int _printDiode(Diode *diode);
-  int _printButton(Button *button);
-  int _printTrafficControl(TrafficControl *trafficControl);
-  int _printTricolor(Tricolor *tricolor);
-  int _printShiftRegister(ShiftRegister * reg);
-    int _printDigitalDisplay(int *input, int *output, int size);
-  int _printSpy(Spy *spy);
-
-  int _printStaticMessage(StaticMessage *msg);
-
-  void printTricolor(Tricolor *tricolor);
-    int getMainColor(int r, int g, int b);
-    int getMix(int mainColor, int r, int g, int b);
-
-
-  Bool _isValidDigital(int pinIx);
-  void _defineInterrupt(int pinIx, int interrId);
-  void _state2Str(DigitalPin *pin, char* str);
-
-// display.c
+//| ==== view.c
+  extern Queue displayed;
+  extern char *termColors[8];
   extern int winRowSize;
   extern int winColSize;
+
   void *_threadView(void *_);
-  void _printView(); //(int row, int col);
   void _addToDisplayed(void *object, int (*printer)(void *o));
+  void _printView(void);
+  int _printIsInterrupted(int isInterrupted);
+  void _state2Str(DigitalPin *pin, char *str);
 
-// tools.c
-  void pushInQueue(Link *link, Queue *queue);
-  void strcpyUpTo(char *dest, char *src, int sup);
-  int countLines(char *str);
-        
-  
-  void *_threadUserCode(void *_);
-  /*
-  void *threadInterruptions(void *_);
-  */
-    void _digitalChangeValue(DigitalPin *pin, int newValue, int fromListener);
-    #define SWITCH 2
-    void addInterrupt(DigitalPin *pin);
-    void _interruptSignalHandler(int _);
+  //| various specific Printable.printers (cf _addToDisplayed()):
+  int _printDiode(Diode *diode);
+  int _printButton(Button *button);
+  int _printTricolor(Tricolor *rgbLED);
+  int _printTrafficControl(TrafficControl *traffic);
+  int _printShiftRegister(ShiftRegister * reg);
+  int _printDigitalDisplay(int *input, int *output, int size);
+  int _printSpy(Spy *spy);
+  int _printStaticMessage(StaticMessage *msg);
+  int _printSeparator(char *cpointer);
 
+//| ==== events.c
   void *_threadListener(void *_);
 
+  #define SWITCH 2
+    //| ^ used as `newValue` argument for _digitalChangeValue()
+    //| has the obvious result of setting the pin value to (oldValue == 0).
+  void _digitalChangeValue(DigitalPin *pin, int newValue, int fromListener);
+  void _addInterrupt(DigitalPin *pin);
+  void _interruptSignalHandler(int _);
+    
 
-void registerPush(void *reg, DigitalPin *pin, int oldVal);
-void registerSend(void *reg, DigitalPin *pin, int oldVal);
+//| ==== tools.c
+  void pushInQueue(Link *link, Queue *queue);
+  void copyList(int *xs, int *into, int size);
+  void printList(int *xs, int size);
+  void shiftList(int *xs, int size, int val);
+  int countLines(char *str);
 
-void shiftList(int *xs, int size, int val);
-void copyList(int *xs, int *into, int size);
-void printList(int *xs, int size);
+//| ==== errors.c
+  void _killThreadView(void);
+  void _fatalError(char *type, char *fn, char *message);
 
-// #define NB_ENABLE 0
-// #define NB_DISABLE 1
-void _noReturnNeededKBEvent(int state);
-
-#define printNL printf("\n")
-#define printTAB printf("\t")
-#define min(a, b) (a < b ? a : b)
-#define max(a, b) (a > b ? a : b)
-
-
-// globals
-extern Arduino sim;
-   // ^ the simulated arduino
-extern Diode diodes[BIGN];
-extern int diodeCount;
-extern Button buttons[BIGN];
-extern int buttonCount;
-extern Tricolor tricolors[BIGN];
-extern int tricolorCount;
-extern TrafficControl trafficControls[BIGN];
-extern int trafficControlCount;
-extern ShiftRegister registers[BIGN];
-extern int registerCount;
-extern Spy spies[BIGN];
-extern int spiesCount;
-extern Queue displayed;
-
-extern char *termColors[8];
-
-extern int winRowSize;
-extern int winColSize;
-
-extern pthread_t threadView;
-  
-
-void _killThreadView(void);
-void _fatalError(char *type, char *fn, char *message);
-
-#endif // FILE_ASIM // wrapper
-
-
-
-
-// TODO:
-// make so pinMode checks the expected value of the mode based on what kind
-// of object the pin is bound to via init();
-// * allow tricolor to only have two or even one color, without
-// having to give dummy pin numbers
-// use static to try to avoid polluting the namespace of client code
-// what happens if analog is sent to an INPUT connected to an interrupt?
-
-
-
-// cases:
-  // calling write/read/analog for wrong types
-  // defining a button/diode/etc for wrong type
-  // handle pullup thing better
-  // delay when sim.interrupted
-
-// check:
-  // what happens when you try to set the value
-  // of something connected to a button
-  // (if it's INPUT, in theory, it changes the pullup option value)
-
-/* ideas:
-  * pause button (but can still use buttons to modify state,
-  and therefore execute interruptions)
-  * freeze button (stop everything)
-  * print to display anything
-  * print static titles in between virtual objects
-  * print value of some variable in real time (with pointer)
-    * maybe permit to give an array of symbolic strings
-    * to replace the dry int version
-    * esp for booleans
-  * change display to reflect any order the use wants
-  * allows adding separations in the display
-  * make the display of all virtual objects generic:
-  typedef struct visible {
-    void *object;
-    void (*printer)(void *object);
-  } Visible;
-
-  * use malloc instead of static sizes of displayed text
-  * the functions used to create virtual objects must NOT work
-    outside of the init function!
-*/
-
-
-/* security:
-   * test for char *name pointers to be null
-
-*/
-
-/*
-- user.c
-- event.c
-- error.c
-- view.c
-- tools.c
-- main.c (includes variables and threads)
-*/
+#endif // FILE_ASIM // total wrapper
