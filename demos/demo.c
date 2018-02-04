@@ -3,8 +3,6 @@
 
 #ifdef __ASIM__
   #include "../src/asim.h"
-
-extern Arduino sim;
 #endif
 
 
@@ -41,6 +39,12 @@ enum {
 
 volatile int spiedInt = 0;
 volatile int trafficState = Open;
+
+void setTraffic(){
+  digitalWrite(traffGreen + trafficState, HIGH);
+  digitalWrite(traffGreen + ((trafficState + 1) % 3), LOW);
+  digitalWrite(traffGreen + ((trafficState + 2) % 3), LOW);
+}
 
 #ifdef __ASIM__
 
@@ -93,6 +97,10 @@ void init(void){
   button(pullupButton, "pull-up", 'p');
   staticMessage("The normal button increments by 10 the spied int.");
   staticMessage("The pullup button changes the state of the traffic lights.");
+
+  separator(' ');
+  staticMessage("Note: if nothing of the above is colored, it means somehow\n"
+    "the code to write with colors does not work for your terminal.");
 }
 #endif
 
@@ -177,11 +185,6 @@ void pushSeq(int rg1, int rg2, int rg3, int *seq, int size){
 
 
 
-void setTraffic(){
-  digitalWrite(traffGreen + trafficState, HIGH);
-  digitalWrite(traffGreen + ((trafficState + 1) % 3), LOW);
-  digitalWrite(traffGreen + ((trafficState + 2) % 3), LOW);
-}
 
 void loop(void){
   pushSeq(rgVal, rgPush, rgSend, nums[spiedInt % 10], 8);
