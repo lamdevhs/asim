@@ -159,13 +159,13 @@ int _printShiftRegister(ShiftRegister * reg){
   if (reg->printer == NULL) {
     int lines = 1;
     if (reg->allVisible) {
-      printf("((");
+      printf("( ");
       printList(reg->input, reg->size);
-      printf("))\n");
+      printf(" )\n");
     }
-    printf("//");
+    printf("# ");
     printList(reg->output, reg->size);
-    printf("//");
+    printf(" #");
     
     printNL;
     return !!reg->allVisible + 1 + countLines(reg->name);

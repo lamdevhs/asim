@@ -44,7 +44,6 @@ void _digitalChangeValue(DigitalPin *pin, int newValue, int fromListener){
   pin->isAnalog = 0;
 
   if (pin->onChange != NULL) {
-    //printf("change!\n");
     pin->onChange(pin->onChangeArg, pin, oldValue);
   }
 
@@ -82,7 +81,9 @@ void _digitalChangeValue(DigitalPin *pin, int newValue, int fromListener){
 //| add an interruption to the queue, and then
 //| calls for an interruption of the userCode thread.
 void _addInterrupt(DigitalPin *pin){
-  if (!pin->canInterrupt) return; // BUG!
+  if (!pin->canInterrupt)
+    _fatalError("BUG", "_addInterrupt",
+      "called on a pin for which canInterrupt is false");
 
   IEvent *ie = (IEvent *)malloc(sizeof(IEvent));
   Link *ieLink = (Link *)malloc(sizeof(Link));
@@ -102,32 +103,32 @@ void _interruptSignalHandler(int _){
   while(1) {
     Link *ieLink = ardu.ieq.out;
     IEvent *ie = (IEvent *)ieLink->content;
-    // TODO: test the pin is the right kind
-    // test out is not NULL, etc
+    // TODO: test whether the pin is the right kind
+    // test whether ieq.out is not NULL, etc
+    // aka all the impossible cases
     if (ie->dead) {
-      // BUG?
-
+      
     }
     else { // take care of it
       ie->dead = 1;
       ie->pin->interrFun();
 
-      // we check that after interrFun in case that one
-      // were meant to modify the mode of that pin
       InterruptMode mode = ie->pin->interrMode;
       if (mode == LOW || mode == HIGH)
         if (mode == ie->pin->value) {
-          // TODO the case of analog is bleh
-          ie->dead = 1; // don't delete the current event
+          // TODO check if the current value isn't analog
+          // though that shouldn't ever happen
+          ie->dead = 0;
+          // don't delete the current event
       }
       else {
         --ardu.ieq.size;
       }
     }
     
-    
     if (ie->dead) {
       if (ieLink->next != NULL) {
+        // ^ is not the last element in the queue:
         // physically delete it only if
         // ieq won't end up empty bc of it
         ardu.ieq.out = ieLink->next;
@@ -135,7 +136,9 @@ void _interruptSignalHandler(int _){
         free(ieLink);
         continue;
       }
-      else { // we took care of all events
+      else {
+        // the queue contains only one event,
+        // which is dead, so we can leave the loop
         break;
       }
     }

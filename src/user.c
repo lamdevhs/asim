@@ -37,11 +37,11 @@ void arduino(ArduinoType type){
   ardu.type = type;
 
     //| dummy event, solely there to prevent
-    //| the queue to ever be empty
+    //| the queue to ever be empty...
     //| this being a relatively scrappy way
     //| to handle access to the same queue
     //| from two different threads... better do it
-    //| with mutex, in future versions...
+    //| with mutex or sth, in future versions...
   IEvent *ie = (IEvent *)malloc(sizeof(IEvent));
   ie->pin = NULL;
   ie->dead = 1;
@@ -55,10 +55,10 @@ void arduino(ArduinoType type){
 
   ardu.interrupted = 0;
 
-  //|first thing in the display list
+  //|first thing in the display list (presumably):
   staticMessage("Simulator for code Arduino.");
   spy(&ardu.interrupted, "user code state", _printIsInterrupted);
-  separator('/');
+  separator('`');
 
   DigitalPin *pin;
 
@@ -67,7 +67,7 @@ void arduino(ArduinoType type){
     pin->mode = MODE_NONE;
     pin->value = LOW;
     pin->canAnalog = 1;
-      //| will depend, in later versions
+      //| ^ will depend, in later versions
     pin->isAnalog = 0;
 
     pin->canInterrupt = 0;
@@ -100,9 +100,7 @@ void arduino(ArduinoType type){
     _defineInterrupt(19, 4);
     _defineInterrupt(20, 3);
     _defineInterrupt(21, 2);
-      //| ^ from the specs.
-      //| whoever chose this correspondence...
-      //| no comment.
+      //| ^ from the specs, no matter how absurd
   }
   else {
     _fatalError("USER", "arduino", "unknown type of arduino");
@@ -221,7 +219,7 @@ void shiftRegister(
   int (*printer)(int *in, int *out, int), Bool allVisible
 ){
   if (registerCount >= BIGN) {
-    return; // ERROR
+    return; // FAIL
   }
   _checkValidDigital(valIx, "shiftRegister");
   _checkValidDigital(pushIx, "shiftRegister");
