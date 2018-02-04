@@ -58,7 +58,7 @@ void arduino(ArduinoType type){
   //|first thing in the display list
   staticMessage("Simulator for code Arduino.");
   spy(&ardu.interrupted, "user code state", _printIsInterrupted);
-  separator('/');
+  separator('`');
 
   DigitalPin *pin;
 

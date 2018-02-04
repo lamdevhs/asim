@@ -1,96 +1,155 @@
 // compilation:
-// gcc -pthread -D __ASIM__ sim.c <filename>.c
+// gcc -pthread -D __ASIM__ <filename>.c path/to/src/*.c
 
 #ifdef __ASIM__
-  #include "sim.h"
+  #include "../src/asim.h"
 
 extern Arduino sim;
 #endif
 
+
 // -------------- pins
 enum {
-  blinkingDiod, // 0
-  yellowDiod,
-
-  // interrupts
-  incrementButton, // 2
-  yellowButton, // 3
+  blinkingDiode, // 0
+  ___, // 1
   
-  
-  pullupButton,
-  normalButton,
-
-  // register
-  rgValue,
-  rgPush,
-  rgSave,
+  pullupButton, // 2
+  normalButton, // 3
 
   // traffic light
-  traffRed,
-  traffOrange,
   traffGreen,
+  traffOrange,
+  traffRed,
+  
 
   // diod RBG
-  rgbRed,
-  rgbGreen,
-  rgbBlue
+  r, g, b,
+
+  // simple register
+  rgVal, rgPush, rgSend,
+
+  // digital display
+  ddVal, ddPush, ddSend
 };
 
-volatile int xvar = 0;
-volatile int yellowState = 0;
+
+enum {
+  Open,
+  Closing,
+  Closed
+};
+
+volatile int spiedInt = 0;
+volatile int trafficState = Open;
 
 #ifdef __ASIM__
 
-enum {
-  zero,
-  one,
-  two,
-  three,
-  four,
-  five,
-  six,
-  seven,
-  eight,
-  nine
-};
-
-int digitName(int value){
-  switch(value % 10) {
-    SYMCASE(zero);
-    SYMCASE(one);
-    SYMCASE(two);
-    SYMCASE(three);
-    SYMCASE(four);
-    SYMCASE(five);
-    SYMCASE(six);
-    SYMCASE(seven);
-    SYMCASE(eight);
-    SYMCASE(nine);
+int trafficStatePrinter(int value){
+  switch(value) {
+    SYMCASE(Open);
+    SYMCASE(Closing);
+    SYMCASE(Closed);
+    default: return -1;
   }
-  return 1;
 }
 
 void init(void){
-  setSim(UNO);
-  diod(blinkingDiod, "blinking diod");
-  diod(yellowDiod, "yellow (with some imagination)");
-  button(yellowButton,
-    "this button is yellow too! guess what it does!", 'y');
-  button(pullupButton, "this button is pullup", 'p');
-  button(normalButton, "this button is *not* pullup", 'n');
-  button(incrementButton,
-    "increment xvar by 10 via interruption, on FALLING", 'i');
-  diodRGB(rgbRed, rgbGreen, rgbBlue, "multicolor diod");
-  traffic(traffRed, traffOrange, traffGreen, "roadlights");
-  digitalDisplay(rgValue, rgPush, rgSave,
-    "value of xvar (mod 100), updated each second");
-  spy(&xvar, "real time value of xvar");
-  spyWithPrinter(&xvar, "real time text value of xvar (mod 10)",
-    digitName);
+  arduino(MEGA);
+
+  separator(' ');
+  staticMessage("A blinking diod:");
+  diode(blinkingDiode, "blinking");
+
+  separator(' ');
+  staticMessage("An RGB LED, lit using analog values:");
+  rgbLED(r, g, b, "multicolor light");
+
+  separator(' ');
+  staticMessage("traffic lights:");
+  traffic(traffRed, traffOrange, traffGreen, "road 66");
+
+  separator(' ');
+  staticMessage("a shift register, showing both the visible (second line)\n"
+    "and invisible, 'temporary' memory:");
+  shiftRegister(rgVal, rgPush, rgSend, "8-bit register", 8, NULL, 1);
+
+  separator(' ');
+  staticMessage("a digital display controlled by a shift register:");
+  digitalDisplay(ddVal, ddPush, ddSend, "2-digit digital display");
+
+  separator(' ');
+  staticMessage("values of user-defined integers can be displayed "
+    "in real time:");
+  spy(&spiedInt, "spied int", NULL);
+
+  separator(' ');
+  staticMessage("a custom printer function can be provided by the user\n"
+    "like here with this variable holding the traffic lights' state:");
+  spy(&trafficState, "traffic state", trafficStatePrinter);
+
+  separator(' ');
+  staticMessage("Buttons are simulated using keyboard keys:");
+  button(normalButton, "normal", 'n');
+  button(pullupButton, "pull-up", 'p');
+  staticMessage("The normal button increments by 10 the spied int.");
+  staticMessage("The pullup button changes the state of the traffic lights.");
 }
 #endif
 
-int nums[][8] = {
+void incrementSpiedInt(){
+  spiedInt += 10;
+}
+
+void changeTraffic(){
+  trafficState = (trafficState + 1) % 3;
+  setTraffic();
+}
+
+void setup(void){
+  pinMode(blinkingDiode, OUTPUT);
+  pinMode(pullupButton, INPUT_PULLUP);
+  pinMode(normalButton, INPUT);
+  // diode rgb
+  pinMode(r, OUTPUT);
+  pinMode(g, OUTPUT);
+  pinMode(b, OUTPUT);
+  // traffic
+  pinMode(traffRed, OUTPUT);
+  pinMode(traffOrange, OUTPUT);
+  pinMode(traffGreen, OUTPUT);
+  // register
+  pinMode(rgPush, OUTPUT);
+  pinMode(rgVal, OUTPUT);
+  pinMode(rgSend, OUTPUT);
+  // digital display
+  pinMode(ddVal, OUTPUT);
+  pinMode(ddPush, OUTPUT);
+  pinMode(ddSend, OUTPUT);
+
+  pinMode(ddSend, OUTPUT);
+
+  attachInterrupt(digitalPinToInterrupt(normalButton),
+    incrementSpiedInt, RISING);
+  attachInterrupt(digitalPinToInterrupt(pullupButton),
+    changeTraffic, FALLING);
+
+  setTraffic();
+}
+
+#define FRQ 200
+void blink(int pin){
+  
+  
+}
+
+void analogBlink(int pin){
+  analogWrite(pin, 42);
+  delay(FRQ);
+  analogWrite(pin, 0);
+  delay(FRQ);
+}
+
+int nums[10][8] = {
   {1,1,1,1,1,1,0,0}, // 0
   {0,1,1,0,0,0,0,0}, // 1
   {1,1,0,1,1,0,1,0}, // 2
@@ -116,84 +175,31 @@ void pushSeq(int rg1, int rg2, int rg3, int *seq, int size){
   digitalWrite(rg3, LOW);
 }
 
-void printXvar(){
-  // push unit digit
-  pushSeq(rgValue, rgPush, rgSave, nums[xvar % 10], 8);
 
-  // push tens digit
-  pushSeq(rgValue, rgPush, rgSave, nums[(xvar % 100) / 10], 8);
+
+void setTraffic(){
+  digitalWrite(traffGreen + trafficState, HIGH);
+  digitalWrite(traffGreen + ((trafficState + 1) % 3), LOW);
+  digitalWrite(traffGreen + ((trafficState + 2) % 3), LOW);
 }
-
-
-void incrementXVar(){
-  xvar += 10;
-  printXvar();
-}
-
-void changeYellowDiod(){
-  yellowState = 1 - yellowState;
-  digitalWrite(yellowDiod, yellowState);
-}
-
-void setup(void){
-  pinMode(blinkingDiod, OUTPUT);
-  pinMode(yellowDiod, OUTPUT);
-  pinMode(yellowButton, INPUT);
-  attachInterrupt(digitalPinToInterrupt(yellowButton),
-    changeYellowDiod, RISING);
-  pinMode(pullupButton, INPUT_PULLUP);
-  pinMode(normalButton, INPUT);
-  pinMode(incrementButton, INPUT);
-  attachInterrupt(digitalPinToInterrupt(incrementButton),
-    incrementXVar, FALLING);
-
-  pinMode(rgbRed, OUTPUT);
-  pinMode(rgbGreen, OUTPUT);
-  pinMode(rgbBlue, OUTPUT);
-
-  pinMode(traffRed, OUTPUT);
-  pinMode(traffOrange, OUTPUT);
-  pinMode(traffGreen, OUTPUT);
-
-  pinMode(rgValue, OUTPUT);
-  pinMode(rgPush, OUTPUT);
-  pinMode(rgSave, OUTPUT);
-}
-
-int rgbState = 0;
-int analogVal = 0;
-void changeRGB(){
-  analogWrite(rgbState + rgbRed, analogVal);
-  digitalWrite(((rgbState + 1) % 3) + rgbRed, LOW);
-  digitalWrite(((rgbState + 2) % 3) + rgbRed, LOW);
-  rgbState = (rgbState + 1) % 3;
-  analogVal = (analogVal + 10) % 256;
-}
-
-int traffState = 0;
-void changeTraffic(){
-  digitalWrite(traffState + traffRed, HIGH);
-  digitalWrite(((traffState + 1) % 3) + traffRed, LOW);
-  digitalWrite(((traffState + 2) % 3) + traffRed, LOW);
-  traffState = (traffState + 1) % 3;
-}
-
-
-int diodState = 0;
-void blinkDiod(){
-  digitalWrite(blinkingDiod, ++diodState % 2);
-}
-
 
 void loop(void){
-  changeRGB();
-  blinkDiod();
-  printXvar();
-  changeTraffic();
-  delay(1000);
-  xvar++;
+  pushSeq(rgVal, rgPush, rgSend, nums[spiedInt % 10], 8);
+  pushSeq(ddVal, ddPush, ddSend, nums[spiedInt % 10], 8);
+  pushSeq(ddVal, ddPush, ddSend, nums[(spiedInt % 100) / 10], 8);
+
+  digitalWrite(blinkingDiode, HIGH);
+  analogWrite(r, 42);
+  delay(FRQ);
+  digitalWrite(blinkingDiode, LOW);
+  analogWrite(r, 0);
+  analogWrite(g, 42);
+  delay(FRQ);
+  analogWrite(g, 0);
+  analogWrite(b, 42);
+  delay(FRQ);
+  analogWrite(b, 0);
+
+  spiedInt++;
+  
 }
-
-
-
-
