@@ -44,7 +44,7 @@ Route routes[NROUTES] = {
   {{10,9,8}, 2, 4, {28, 26, 24}},
   {{7,6,5}, 3, 11, {50, 48, 46}}
 };
-int urgence = 21; // pin du bouton d'urgence
+int urgence = 18; // pin du bouton d'urgence
 
 
 
@@ -111,7 +111,6 @@ void initJour(){
 
 
 void urgenceEvenement(){
-  return;
   changementMode = 1;
 }
 
@@ -157,13 +156,16 @@ void afficherDureeFeuRouge(){
 }
 
 void effacerAffichage(){
-  Route *r = &routes[1 - routeOuverte];
-  pushSeq(r->affichage[0],
-    r->affichage[1],
-    r->affichage[2], nums[10], 8);
-  pushSeq(r->affichage[0],
-    r->affichage[1],
-    r->affichage[2], nums[11], 8);
+  int i;
+  for (i = 0; i < NROUTES; i++){
+    Route *r = &routes[i];
+    pushSeq(r->affichage[0],
+      r->affichage[1],
+      r->affichage[2], nums[10], 8);
+    pushSeq(r->affichage[0],
+      r->affichage[1],
+      r->affichage[2], nums[11], 8);
+  }
 }
 
 
@@ -205,6 +207,7 @@ void modeJour(){
 
 void initNuit(){
   int i,j;
+  effacerAffichage();
   for (j = 0; j < NROUTES; j++) {
     Route *route = &routes[j];
     for (i = 0; i < NCOULEURS; i++) {
