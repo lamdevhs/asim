@@ -24,13 +24,10 @@ typedef enum routeIx {
 } RouteIx;
 
 
-#define JOUR 1
-#define NUIT 0
-
 #define NCOULEURS 3
 #define NROUTES 2
 
-#define PIETON_ACCEL_VERT 1
+#define PIETON_ACCEL_VERT 2
   // ^ a combien se reduit la duree du feu lorsqu'un pieton
   // appuie sur le bouton pour traverser
 
@@ -44,10 +41,10 @@ typedef struct route {
 
 
 Route routes[NROUTES] = {
-  {{6,5,4}, 20, 18, {34, 35, 36}},
-  {{9,8,7}, 21, 19, {37, 38, 39}}
+  {{10,9,8}, 2, 4, {34, 35, 36}},
+  {{7,6,5}, 3, 11, {37, 38, 39}}
 };
-int urgence = 2; // pin du bouton d'urgence
+int urgence = 21; // pin du bouton d'urgence
 
 
 
@@ -57,7 +54,8 @@ volatile EtatFeu etatRouteOuverte = Rouge; // feu des voitures
 volatile int tempsRestant = 1; // en secondes
 volatile int pietonVeutTraverser = 0;
 
-volatile int mode = JOUR;
+int jour = 1;
+volatile int changementMode = 0;
 
 void changerFeux(RouteIx route, EtatFeu etat){
   int *feux = routes[route].feux;
@@ -89,19 +87,19 @@ int prologue(){
   }
 }
 
-void pietonEvenement(){
-  RouteIx ici = (digitalRead(routes[1].btnPieton) == HIGH);
-    // ^ vaut 1 si le btnPieton de la route 1 est HIGH, 0 sinon
-    // pour verifier quel bouton pieton a ete appuye
-  
+void pietonEvenement(RouteIx ici){
   if (routeOuverte != ici ||
-    etatRouteOuverte != Vert) return;
+    etatRouteOuverte != Vert || !jour) return;
   // sinon:
+  // on est en journee
   // la route du piéton est bien ouverte (aux voitures)
   // et le feu des voitures est vert
   tempsRestant = min(tempsRestant, PIETON_ACCEL_VERT);
   pietonVeutTraverser = 1;
 }
+
+void pietonEvH(){ pietonEvenement(Hauteur); }
+void pietonEvL(){ pietonEvenement(Largeur); }
 
 void initJour(){
   routeOuverte = Largeur;
@@ -113,12 +111,56 @@ void initJour(){
 
 
 void urgenceEvenement(){
-  mode = 1 - mode;
-  if (mode == JOUR) initJour();
+  changementMode = 1;
 }
 
+
+
+int nums[10][8] = {
+  {1,1,1,1,1,1,0,0}, // 0
+  {0,1,1,0,0,0,0,0}, // 1
+  {1,1,0,1,1,0,1,0}, // 2
+  {1,1,1,1,0,0,1,0}, // 3
+  {0,1,1,0,0,1,1,0}, // 4
+  {1,0,1,1,0,1,1,0}, // 5
+  {1,0,1,1,1,1,1,0}, // 6
+  {1,1,1,0,0,0,0,0}, // 7
+  {1,1,1,1,1,1,1,0}, // 8
+  {1,1,1,1,0,1,1,0}, // 9
+};
+
+void pushSeq(int rg1, int rg2, int rg3, int *seq, int size){
+  digitalWrite(rg2, LOW);
+  int i;
+  for (i = size - 1; i >= 0; i--){
+    digitalWrite(rg1, seq[i]);
+    digitalWrite(rg2, HIGH);
+    digitalWrite(rg2, LOW);
+  }
+  digitalWrite(rg3, LOW);
+  digitalWrite(rg3, HIGH);
+  digitalWrite(rg3, LOW);
+}
+
+
 void afficherDureeFeuRouge(){
-  
+  Route *r = &routes[1 - routeOuverte];
+  pushSeq(r->affichage[0],
+    r->affichage[1],
+    r->affichage[2], nums[tempsRestant % 10], 8);
+  pushSeq(r->affichage[0],
+    r->affichage[1],
+    r->affichage[2], nums[tempsRestant / 10], 8);
+}
+
+void effacerAffichage(){
+  Route *r = &routes[1 - routeOuverte];
+  pushSeq(r->affichage[0],
+    r->affichage[1],
+    r->affichage[2], nums[0], 8);
+  pushSeq(r->affichage[0],
+    r->affichage[1],
+    r->affichage[2], nums[9], 8);
 }
 
 
@@ -135,6 +177,7 @@ void modeJour(){
   }
   else if (etatRouteOuverte == Rouge) {
     // change de route ouverte:
+    effacerAffichage();
     routeOuverte = 1 - routeOuverte;
     etatRouteOuverte = Vert;
     tempsRestant = 5;
@@ -157,15 +200,30 @@ void modeJour(){
   }
 }
 
+void initNuit(){
+  int i,j;
+  for (j = 0; j < NROUTES; j++) {
+    Route *route = &routes[j];
+    for (i = 0; i < NCOULEURS; i++) {
+      digitalWrite(route->feux[i], LOW);
+    }
+  }
+}
+
+#define FreqNuit 1000
 void modeNuit() {
-  int i;
-  for (i = 0; i)
+  digitalWrite(routes[Hauteur].feux[Orange], HIGH);
+  digitalWrite(routes[Largeur].feux[Orange], HIGH);
+  delay(FreqNuit);
+  digitalWrite(routes[Hauteur].feux[Orange], LOW);
+  digitalWrite(routes[Largeur].feux[Orange], LOW);
+  delay(FreqNuit);
 }
 
 
 
 void setup(void){
-  int i, j;
+  int i, j, k;
   int departFeux = 4;
   int departPieton = 20;
   int departVoitures = 18;
@@ -173,36 +231,39 @@ void setup(void){
   for (j = 0; j < NROUTES; j++) {
     Route *route = &routes[j];
     for (i = 0; i < NCOULEURS; i++) {
-      // 4,5,6 pour route j = 0, 7,8,9 pour route 1
-      //route->feux[i] = 4 + 3*j + i;
       pinMode(route->feux[i], OUTPUT);
     }
-    //route->btnPieton = departPieton + j;
-    //route->captVoiture = departVoitures + j;
     pinMode(route->btnPieton, INPUT);
     pinMode(route->captVoiture, INPUT);
-    attachInterrupt(
-      digitalPinToInterrupt(route->btnPieton),
-      pietonEvenement, RISING);
 
-    for (i = 0; i < 3; i++) {
-      // 34,35,36 pour route j = 0,
-      // 37,38,39 pour route 1
-      //route->affichage[i] = 34 + 3*j + i;
-      pinMode(route->affichage[i], OUTPUT);
+    for (k = 0; k < 3; k++){
+      pinMode(route->affichage[k], OUTPUT);
     }
   }
 
+  attachInterrupt(
+    digitalPinToInterrupt(routes[Hauteur].btnPieton),
+    pietonEvH, RISING);
+  attachInterrupt(
+    digitalPinToInterrupt(routes[Largeur].btnPieton),
+    pietonEvL, RISING);
+
   pinMode(urgence, INPUT);
   attachInterrupt(
-    digitalPinToInterrupt(urgence),
-    urgenceEvenement, RISING);
+    digitalPinToInterrupt(urgence), urgenceEvenement,
+    FALLING);
   prologue();
 }
 
 
 void loop(void){
-  if (mode == JOUR) modeJour();
+  if (changementMode) {
+    changementMode = 0;
+    jour = 1-jour;
+    if (jour) initJour();
+    else initNuit();
+  }
+  if (jour) modeJour();
   else modeNuit();
 }
 
@@ -210,38 +271,55 @@ void loop(void){
 #define EMPTY 0
 
 void init(void){
-  setSim(UNO);
+  arduino(MEGA);
   Route largeur = routes[Largeur];
   Route hauteur = routes[Hauteur];
+
   traffic(
     largeur.feux[Rouge],
     largeur.feux[Orange],
     largeur.feux[Vert],
     "feux largeur");
-  traffic(
-    hauteur.feux[Rouge],
-    hauteur.feux[Orange],
-    hauteur.feux[Vert],
-    "feux hauteur");
-  traffic(
-    largeur.feux[Rouge],
-    EMPTY,
-    largeur.feux[Vert],
-    "feux pieton hauteur");
+  digitalDisplay(largeur.affichage[0], largeur.affichage[1],
+    largeur.affichage[2], "afficheur largeur");
   traffic(
     hauteur.feux[Rouge],
     EMPTY,
     hauteur.feux[Vert],
     "feux pieton largeur");
   button(largeur.btnPieton, "pieton largeur", 'l');
-  button(hauteur.btnPieton, "pieton hauteur", 'h');
   button(largeur.captVoiture, "capteur voitures largeur", 'v');
+
+
+
+  
+  separator('-');
+  traffic(
+    hauteur.feux[Rouge],
+    hauteur.feux[Orange],
+    hauteur.feux[Vert],
+    "feux hauteur");
+  digitalDisplay(hauteur.affichage[0], hauteur.affichage[1],
+    hauteur.affichage[2], "afficheur hauteur");
+  traffic(
+    largeur.feux[Rouge],
+    EMPTY,
+    largeur.feux[Vert],
+    "feux pieton hauteur");
+  button(hauteur.btnPieton, "pieton hauteur", 'h');
   button(hauteur.captVoiture, "capteur voitures hauteur", 'w');
   button(urgence, "urgence", 'u');
-  digitalDisplay(largeur.affichage[0], largeur.affichage[1], largeur.affichage[2],
-    "affichage attente largeur");
-  digitalDisplay(hauteur.affichage[0], hauteur.affichage[1], hauteur.affichage[2],
-    "affichage attente hauteur");
+
+  separator('-');
+  spy(&routeOuverte, "route ouverte", NULL);
+  spy(&etatRouteOuverte, "etat route", NULL);
+  spy(&tempsRestant, "temps restant", NULL);
+  spy(&pietonVeutTraverser, "pieton veut traverser", NULL);
+  
+  separator('-');
+  spy(&changementMode, "changementMode", NULL);
+  spy(&jour, "jour", NULL);
+
 }
 
 
