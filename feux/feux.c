@@ -41,8 +41,8 @@ typedef struct route {
 
 
 Route routes[NROUTES] = {
-  {{10,9,8}, 2, 4, {34, 35, 36}},
-  {{7,6,5}, 3, 11, {37, 38, 39}}
+  {{10,9,8}, 2, 4, {28, 26, 24}},
+  {{7,6,5}, 3, 11, {50, 48, 46}}
 };
 int urgence = 21; // pin du bouton d'urgence
 
@@ -111,12 +111,13 @@ void initJour(){
 
 
 void urgenceEvenement(){
+  return;
   changementMode = 1;
 }
 
 
 
-int nums[10][8] = {
+int nums[][8] = {
   {1,1,1,1,1,1,0,0}, // 0
   {0,1,1,0,0,0,0,0}, // 1
   {1,1,0,1,1,0,1,0}, // 2
@@ -127,6 +128,8 @@ int nums[10][8] = {
   {1,1,1,0,0,0,0,0}, // 7
   {1,1,1,1,1,1,1,0}, // 8
   {1,1,1,1,0,1,1,0}, // 9
+  {1,0,1,1,1,1,0,0}, // G
+  {0,0,1,1,1,0,1,0}, // o
 };
 
 void pushSeq(int rg1, int rg2, int rg3, int *seq, int size){
@@ -147,20 +150,20 @@ void afficherDureeFeuRouge(){
   Route *r = &routes[1 - routeOuverte];
   pushSeq(r->affichage[0],
     r->affichage[1],
-    r->affichage[2], nums[tempsRestant % 10], 8);
+    r->affichage[2], nums[tempsRestant / 10], 8);
   pushSeq(r->affichage[0],
     r->affichage[1],
-    r->affichage[2], nums[tempsRestant / 10], 8);
+    r->affichage[2], nums[tempsRestant % 10], 8);
 }
 
 void effacerAffichage(){
   Route *r = &routes[1 - routeOuverte];
   pushSeq(r->affichage[0],
     r->affichage[1],
-    r->affichage[2], nums[0], 8);
+    r->affichage[2], nums[10], 8);
   pushSeq(r->affichage[0],
     r->affichage[1],
-    r->affichage[2], nums[9], 8);
+    r->affichage[2], nums[11], 8);
 }
 
 
